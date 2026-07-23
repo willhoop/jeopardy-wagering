@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeopardy! Wager Trainer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Anton&family=Arial:wght@400;700&display=swap');
+
+  :root {
+    --jeopardy-blue: #060CE9;
+    --jeopardy-dark: #04089B;
+    --jeopardy-gold: #FFCC00;
+    --jeopardy-gold-dim: #C9A227;
+    --win-green: #2ecc71;
+    --lose-red: #e74c3c;
+    --card-bg: #0a17b8;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: radial-gradient(ellipse at top, #0d17c4 0%, #04086b 60%, #020454 100%);
+    color: #fff;
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  header {
+    text-align: center;
+    padding: 28px 16px 18px;
+    border-bottom: 4px solid var(--jeopardy-gold);
+    background: linear-gradient(180deg, #0410a8 0%, #060CE9 100%);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+  }
+
+  header h1 {
+    font-family: 'Anton', Arial, sans-serif;
+    letter-spacing: 3px;
+    font-size: 2.6em;
+    margin: 0;
+    color: var(--jeopardy-gold);
+    text-shadow: 3px 3px 0 #000, 0 0 20px rgba(255,204,0,0.4);
+  }
+
+  header p {
+    margin: 6px 0 0;
+    color: #dfe3ff;
+    font-size: 0.95em;
+  }
+
+  nav.tabs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 22px auto 0;
+    max-width: 900px;
+    padding: 0 12px;
+  }
+
+  nav.tabs button {
+    font-family: 'Anton', Arial, sans-serif;
+    letter-spacing: 1px;
+    background: var(--card-bg);
+    color: #fff;
+    border: 2px solid var(--jeopardy-gold-dim);
+    border-radius: 8px;
+    padding: 12px 18px;
+    cursor: pointer;
+    font-size: 0.95em;
+    transition: all 0.15s ease;
+  }
+
+  nav.tabs button:hover { border-color: var(--jeopardy-gold); transform: translateY(-2px); }
+
+  nav.tabs button.active {
+    background: var(--jeopardy-gold);
+    color: #04086b;
+    border-color: var(--jeopardy-gold);
+  }
+
+  main {
+    max-width: 900px;
+    margin: 28px auto;
+    padding: 0 16px;
+  }
+
+  section.panel { display: none; animation: fadeIn 0.25s ease; }
+  section.panel.active { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity:1; transform:none; } }
+
+  .card {
+    background: var(--card-bg);
+    border: 2px solid var(--jeopardy-gold-dim);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  }
+
+  .card h2 {
+    font-family: 'Anton', Arial, sans-serif;
+    color: var(--jeopardy-gold);
+    letter-spacing: 1px;
+    margin-top: 0;
+    font-size: 1.3em;
+  }
+
+  label {
+    display: block;
+    font-size: 0.85em;
+    color: #cfd4ff;
+    margin: 14px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  input[type=number], select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #3846d6;
+    background: #0e1ad4;
+    color: #fff;
+    font-size: 1.05em;
+  }
+
+  input[type=range] { width: 100%; accent-color: var(--jeopardy-gold); }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 640px) { .row, .row3 { grid-template-columns: 1fr; } }
+
+  .radio-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .radio-group button {
+    flex: 1;
+    background: #0e1ad4;
+    border: 1px solid #3846d6;
+    color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .radio-group button.selected { background: var(--jeopardy-gold); color: #04086b; border-color: var(--jeopardy-gold); }
+
+  .confidence-label {
+    text-align: center;
+    font-size: 1.15em;
+    font-weight: bold;
+    color: var(--jeopardy-gold);
+    margin-top: 6px;
+    min-height: 1.4em;
+  }
+
+  button.primary {
+    display: block;
+    width: 100%;
+    margin-top: 22px;
+    padding: 16px;
+    font-family: 'Anton', Arial, sans-serif;
+    letter-spacing: 1px;
+    font-size: 1.15em;
+    background: var(--jeopardy-gold);
+    color: #04086b;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  button.primary:hover { transform: scale(1.015); }
+  button.primary:active { transform: scale(0.985); }
+
+  .result-hero {
+    text-align: center;
+    padding: 18px 0;
+  }
+  .result-hero .amount {
+    font-family: 'Anton', Arial, sans-serif;
+    font-size: 3em;
+    color: var(--jeopardy-gold);
+    text-shadow: 2px 2px 0 #000;
+  }
+  .result-hero .label { font-size: 0.9em; color: #cfd4ff; text-transform: uppercase; letter-spacing: 1px; }
+
+  .notes { margin-top: 14px; font-size: 0.9em; color: #dfe3ff; line-height: 1.5; }
+  .notes li { margin-bottom: 6px; }
+
+  .bar-chart { margin-top: 18px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; font-size: 0.78em; }
+  .bar-row .w-label { width: 70px; text-align: right; color: #cfd4ff; flex-shrink: 0; }
+  .bar-track { flex: 1; background: #04086b; border-radius: 4px; overflow: hidden; height: 16px; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #3846d6, var(--jeopardy-gold)); }
+  .bar-fill.best { background: var(--win-green); }
+  .bar-row .p-label { width: 44px; color: #fff; font-weight: bold; }
+  .curve-explain { margin-top: 10px; padding: 10px 14px; background: #04086b; border-left: 3px solid var(--jeopardy-gold); border-radius: 6px; font-size: 0.85em; line-height: 1.4; color: #e8e8ff; }
+
+  .tier-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .tier-compare { grid-template-columns: 1fr; } }
+  .tier-card { background: #0e1ad4; border: 1px solid var(--jeopardy-gold-dim); border-radius: 10px; padding: 16px; }
+  .tier-card h3 { margin-top: 0; color: var(--jeopardy-gold); font-family: 'Anton', Arial, sans-serif; font-size: 1em; letter-spacing: 1px;}
+
+  .clue-card {
+    background: linear-gradient(160deg, #0410a8, #060CE9);
+    border: 3px solid var(--jeopardy-gold);
+    border-radius: 16px;
+    padding: 26px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(255,204,0,0.15), 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .clue-card .kicker { color: var(--jeopardy-gold); letter-spacing: 2px; font-size: 0.8em; text-transform: uppercase; }
+  .clue-card .scenario-text { font-family: 'Anton', Arial, sans-serif; font-size: 1.4em; margin: 12px 0; line-height: 1.35; }
+
+  .podiums { display: flex; justify-content: center; gap: 14px; margin: 18px 0; flex-wrap: wrap; }
+  .podium { background: #04086b; border: 1px solid var(--jeopardy-gold-dim); border-radius: 10px; padding: 10px 16px; min-width: 100px; }
+  .podium.you { border-color: var(--jeopardy-gold); }
+  .podium .who { font-size: 0.75em; color: #cfd4ff; text-transform: uppercase; }
+  .podium .amt { font-family: 'Anton', Arial, sans-serif; font-size: 1.2em; }
+
+  .quiz-input { display: flex; gap: 10px; margin-top: 18px; }
+  .quiz-input input { flex: 1; font-size: 1.3em; text-align: center; }
+  .quiz-input button { padding: 0 24px; border-radius: 8px; border: none; background: var(--jeopardy-gold); color: #04086b; font-weight: bold; cursor: pointer; }
+
+  .grade {
+    text-align: center;
+    font-family: 'Anton', Arial, sans-serif;
+    font-size: 3.2em;
+    margin: 10px 0;
+  }
+  .grade.win { color: var(--win-green); }
+  .grade.mid { color: var(--jeopardy-gold); }
+  .grade.bad { color: var(--lose-red); }
+
+  .stat-bar { display: flex; justify-content: center; gap: 26px; margin-top: 10px; }
+  .stat { text-align: center; }
+  .stat .n { font-family: 'Anton', Arial, sans-serif; font-size: 1.6em; color: var(--jeopardy-gold); }
+  .stat .l { font-size: 0.75em; color: #cfd4ff; text-transform: uppercase; }
+
+  .flavor { font-style: italic; color: #dfe3ff; margin-top: 10px; }
+
+  .hidden { display: none !important; }
+
+  .confetti-piece {
+    position: fixed;
+    top: -10px;
+    width: 8px; height: 14px;
+    opacity: 0.9;
+    pointer-events: none;
+    animation: fall linear forwards;
+    z-index: 999;
+  }
+  @keyframes fall {
+    to { transform: translateY(105vh) rotate(360deg); opacity: 0.3; }
+  }
+
+  .explain-list { padding-left: 20px; }
+  .explain-list li { margin-bottom: 8px; }
+
+  footer { text-align: center; color: #9aa2e0; font-size: 0.8em; margin-top: 30px; }
+  footer code { background: #04086b; padding: 2px 6px; border-radius: 4px; }
+  footer a { color: var(--jeopardy-gold); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Jeopardy! Wager Trainer</h1>
+  <p>Practice the wagers that actually matter — Daily Doubles and Final Jeopardy.</p>
+</header>
+
+<nav class="tabs">
+  <button data-tab="dd" class="active">Daily Double</button>
+  <button data-tab="fj">Final Jeopardy</button>
+  <button data-tab="quiz">Quiz Me</button>
+  <button data-tab="about">How This Works</button>
+</nav>
+
+<main>
+
+  <!-- ===================== DAILY DOUBLE TAB ===================== -->
+  <section class="panel active" id="panel-dd">
+    <div class="card">
+      <h2>🟡 You found a Daily Double</h2>
+
+      <label>Round</label>
+      <div class="radio-group" id="dd-round">
+        <button data-val="1" class="selected">Single Jeopardy</button>
+        <button data-val="2">Double Jeopardy</button>
+      </div>
+
+      <label>How many rivals are in the game?</label>
+      <div class="radio-group" id="dd-numrivals">
+        <button data-val="0">Solo practice</button>
+        <button data-val="1">1 rival</button>
+        <button data-val="2" class="selected">2 rivals</button>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label>Your score</label>
+          <input type="number" id="dd-self" value="4200" step="100">
+        </div>
+        <div id="dd-rival1-wrap">
+          <label>Rival 1 score</label>
+          <input type="number" id="dd-rival1" value="6000" step="100">
+        </div>
+        <div id="dd-rival2-wrap">
+          <label>Rival 2 score</label>
+          <input type="number" id="dd-rival2" value="3400" step="100">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Money still in play on the board (approx.)</label>
+          <select id="dd-board-select">
+            <option value="1000">$1,000</option>
+            <option value="2000">$2,000</option>
+            <option value="3000">$3,000</option>
+            <option value="4000">$4,000</option>
+            <option value="5000">$5,000</option>
+            <option value="6000">$6,000</option>
+            <option value="7000">$7,000</option>
+            <option value="8000" selected>$8,000</option>
+            <option value="9000">$9,000</option>
+            <option value="10000">$10,000</option>
+            <option value="12000">$12,000</option>
+            <option value="14000">$14,000</option>
+            <option value="16000">$16,000</option>
+            <option value="18000">$18,000</option>
+            <option value="20000">$20,000</option>
+            <option value="exact">Exact amount…</option>
+          </select>
+          <input type="number" id="dd-board" value="8000" step="100" class="hidden" style="margin-top:8px;">
+        </div>
+        <div>
+          <label>Daily Doubles still hidden after this one</label>
+          <select id="dd-remaining">
+            <option value="0">None — this is the last one</option>
+          </select>
+        </div>
+      </div>
+
+      <label>How do you feel about this category?</label>
+      <input type="range" min="0" max="100" value="55" id="dd-confidence">
+      <div class="confidence-label" id="dd-confidence-label"></div>
+
+      <button class="primary" onclick="runDDAnalysis()">Crunch the numbers</button>
+    </div>
+
+    <div class="card hidden" id="dd-results">
+      <h2>Recommendation</h2>
+      <div class="result-hero">
+        <div class="amount" id="dd-result-amount">$0</div>
+        <div class="label">recommended wager</div>
+      </div>
+      <div class="bar-chart" id="dd-bar-chart"></div>
+      <ul class="notes" id="dd-notes"></ul>
+    </div>
+  </section>
+
+  <!-- ===================== FINAL JEOPARDY TAB ===================== -->
+  <section class="panel" id="panel-fj">
+    <div class="card">
+      <h2>🎵 Final Jeopardy</h2>
+
+      <label>How many players?</label>
+      <div class="radio-group" id="fj-numplayers">
+        <button data-val="1">Just you</button>
+        <button data-val="2">2 players</button>
+        <button data-val="3" class="selected">3 players</button>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label>Your score</label>
+          <input type="number" id="fj-self" value="12000" step="100">
+        </div>
+        <div id="fj-p2-wrap">
+          <label>Opponent A score</label>
+          <input type="number" id="fj-p2" value="9000" step="100">
+        </div>
+        <div id="fj-p3-wrap">
+          <label>Opponent B score</label>
+          <input type="number" id="fj-p3" value="6000" step="100">
+        </div>
+      </div>
+
+      <label>How do you feel about this category?</label>
+      <input type="range" min="0" max="100" value="55" id="fj-confidence">
+      <div class="confidence-label" id="fj-confidence-label"></div>
+
+      <button class="primary" onclick="runFJAnalysis()">Get my wagers</button>
+    </div>
+
+    <div class="card hidden" id="fj-results">
+      <h2>Two ways to think about it</h2>
+      <div class="tier-compare">
+        <div class="tier-card">
+          <h3>🛡️ Safe Bet (Tier 1)</h3>
+          <p style="font-size:2em; color:var(--jeopardy-gold); font-family:'Anton',Arial,sans-serif;" id="fj-tier1-amount">$0</p>
+          <p id="fj-tier1-explain" style="font-size:0.9em; color:#dfe3ff;"></p>
+        </div>
+        <div class="tier-card">
+          <h3>🧠 Smart Bet (Tier 2)</h3>
+          <p style="font-size:2em; color:var(--jeopardy-gold); font-family:'Anton',Arial,sans-serif;" id="fj-tier2-amount">$0</p>
+          <p id="fj-tier2-explain" style="font-size:0.9em; color:#dfe3ff;"></p>
+        </div>
+      </div>
+      <div class="bar-chart" id="fj-bar-chart"></div>
+      <ul class="notes" id="fj-notes"></ul>
+    </div>
+  </section>
+
+  <!-- ===================== QUIZ TAB ===================== -->
+  <section class="panel" id="panel-quiz">
+    <div class="card">
+      <div class="stat-bar">
+        <div class="stat"><div class="n" id="quiz-score">0</div><div class="l">Score</div></div>
+        <div class="stat"><div class="n" id="quiz-streak">0</div><div class="l">Streak</div></div>
+        <div class="stat"><div class="n" id="quiz-best">0</div><div class="l">Best streak</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="quiz-empty">
+        <p style="text-align:center; color:#dfe3ff;">Get a random Daily Double or Final Jeopardy scenario and see how close your gut wager comes to the optimal play.</p>
+        <button class="primary" onclick="newQuizScenario()">New Scenario</button>
+      </div>
+
+      <div id="quiz-active" class="hidden">
+        <div class="clue-card">
+          <div class="kicker" id="quiz-kicker">DAILY DOUBLE</div>
+          <div class="podiums" id="quiz-podiums"></div>
+          <div class="scenario-text" id="quiz-scenario-text"></div>
+          <div class="flavor" id="quiz-flavor"></div>
+        </div>
+        <div class="quiz-input">
+          <input type="number" id="quiz-wager-input" placeholder="Your wager, $">
+          <button onclick="submitQuizWager()">Lock it in!</button>
+        </div>
+      </div>
+
+      <div id="quiz-reveal" class="hidden">
+        <div class="grade" id="quiz-grade">A+</div>
+        <p style="text-align:center;" id="quiz-reveal-text"></p>
+        <div class="bar-chart" id="quiz-bar-chart"></div>
+        <button class="primary" onclick="newQuizScenario()">Next Scenario</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== ABOUT TAB ===================== -->
+  <section class="panel" id="panel-about">
+    <div class="card">
+      <h2>How this actually works</h2>
+      <p>There are two different questions this tool can answer, and they're not the same question:</p>
+      <ul class="explain-list">
+        <li><strong>Safe Bet (Tier 1):</strong> "What wager can't hurt me if I'm right?" This assumes your opponents play the worst possible way against you — betting everything and getting it right — and finds the wager that beats that no matter what. It needs no guess about your confidence at all.</li>
+        <li><strong>Smart Bet (Tier 2 / Daily Double engine):</strong> "Given how sure I actually am, and a guess at how opponents tend to bet, what wager gives me the best real odds of winning?" This one uses your confidence slider and can recommend a smaller, less paranoid wager than the Safe Bet when it's justified.</li>
+      </ul>
+      <p>The Smart Bet's opponent-behavior assumptions are honest placeholders, not numbers pulled from thousands of real games — see <code>docs/adr/0002-opponent-model-assumptions.md</code> in the project for the details. Treat its exact win-probability numbers as directionally useful, not gospel.</p>
+      <p>The underlying math lives in Python at <code>engine/fj_wager.py</code>, <code>engine/fj_bestresponse.py</code>, <code>engine/simulate.py</code>, and <code>engine/dd_wager.py</code>, with tests in <code>tests/</code>. This page is a hand-written JavaScript port of that same logic so it can run instantly in a browser — it mirrors the Python engine but is not itself covered by the automated test suite yet.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Jeopardy! Wager Trainer — practice tool, not affiliated with the show.<br>
+  Built by <a href="https://willhoop.github.io/" target="_blank" rel="noopener">willhoop.github.io</a>
+</footer>
+
+<script>
+/* =========================================================
+   CORE WAGERING LOGIC
+   Mirrors engine/fj_wager.py, engine/fj_bestresponse.py,
+   engine/simulate.py, engine/dd_wager.py.
+   ========================================================= */
+
+function legalMaxWager(score) { return Math.max(score, 0); }
+function worstCaseCeiling(score) { return score <= 0 ? score : 2 * score; }
+
+function fjTier1(scores, playerIndex) {
+  const playerScore = scores[playerIndex];
+  const opponents = scores.map((s, i) => ({ i, s })).filter(o => o.i !== playerIndex);
+  const maxWager = legalMaxWager(playerScore);
+
+  if (opponents.length === 0) {
+    return { lockout: true, minWager: 0, maxWager, lockTieWager: null, bindingIndex: null };
+  }
+
+  const ceilings = opponents.map(o => ({ i: o.i, c: worstCaseCeiling(o.s) }));
+  ceilings.sort((a, b) => b.c - a.c);
+  const bindingIndex = ceilings[0].i;
+  const bindingCeiling = ceilings[0].c;
+  const lockout = playerScore > bindingCeiling;
+
+  let minWager = null;
+  if (lockout) {
+    minWager = 0;
+  } else {
+    const required = bindingCeiling - playerScore + 1;
+    minWager = required <= maxWager ? required : null;
+  }
+
+  let lockTieWager = null;
+  if (!lockout) {
+    const bindingScore = scores[bindingIndex];
+    const others = scores.filter((s, i) => i !== playerIndex && i !== bindingIndex);
+    const bindingLocked = others.length === 0 || others.every(s => bindingScore > worstCaseCeiling(s));
+    if (bindingLocked && playerScore * 2 === bindingScore) lockTieWager = playerScore;
+  }
+
+  return { lockout, minWager, maxWager, lockTieWager, bindingIndex };
+}
+
+function defaultOpponentDist(scores, oppIdx) {
+  const rec = fjTier1(scores, oppIdx);
+  const cands = new Set([0, rec.maxWager]);
+  if (rec.minWager != null) cands.add(rec.minWager);
+  if (rec.lockTieWager != null) cands.add(rec.lockTieWager);
+  const arr = [...cands].filter(c => c >= 0 && c <= rec.maxWager).sort((a, b) => a - b);
+  const w = 1 / arr.length;
+  return arr.map(c => [c, w]);
+}
+
+function* cartesian(arrs, idx = 0, acc = []) {
+  if (idx === arrs.length) { yield acc; return; }
+  for (const item of arrs[idx]) yield* cartesian(arrs, idx + 1, [...acc, item]);
+}
+
+// Returns [tie-inclusive win probability, strict win probability] for one
+// candidate wager -- exact enumeration, no Monte Carlo noise here. The two
+// numbers differ only in whether an exact tie for first counts (the show's
+// real rule says yes). The gap between them is used purely to break ties:
+// see fjTier2() below for why that matters.
+function outcomeProbabilities(selfScore, selfWager, pSelf, opponents) {
+  let winTotal = 0;
+  let strictTotal = 0;
+  for (const selfCorrect of [true, false]) {
+    const pS = selfCorrect ? pSelf : 1 - pSelf;
+    if (pS === 0) continue;
+    const selfFinal = selfCorrect ? selfScore + selfWager : selfScore - selfWager;
+
+    const branchesList = opponents.map(o => {
+      const b = [];
+      for (const [w, wp] of o.dist) {
+        for (const correct of [true, false]) {
+          const p = wp * (correct ? o.pCorrect : 1 - o.pCorrect);
+          if (p === 0) continue;
+          b.push([correct ? o.score + w : o.score - w, p]);
+        }
+      }
+      return b;
+    });
+
+    if (branchesList.length === 0) { winTotal += pS; strictTotal += pS; continue; }
+
+    for (const combo of cartesian(branchesList)) {
+      let p = pS;
+      let maxOpp = -Infinity;
+      for (const [final, pp] of combo) { p *= pp; if (final > maxOpp) maxOpp = final; }
+      if (p === 0) continue;
+      if (selfFinal >= maxOpp) winTotal += p;
+      if (selfFinal > maxOpp) strictTotal += p;
+    }
+  }
+  return [winTotal, strictTotal];
+}
+
+function expectedWinProbability(selfScore, selfWager, pSelf, opponents) {
+  return outcomeProbabilities(selfScore, selfWager, pSelf, opponents)[0];
+}
+
+function fjTier2(scores, playerIndex, pSelf, oppCorrect = 0.5) {
+  const selfScore = scores[playerIndex];
+  const maxWager = legalMaxWager(selfScore);
+  const opponents = scores
+    .map((s, i) => i)
+    .filter(i => i !== playerIndex)
+    .map(i => ({ score: scores[i], dist: defaultOpponentDist(scores, i), pCorrect: oppCorrect }));
+
+  const tier1 = fjTier1(scores, playerIndex);
+  const candidateSet = new Set();
+  const step = Math.max(1, Math.round(maxWager / 30) || 1);
+  for (let w = 0; w <= maxWager; w += step) candidateSet.add(w);
+  candidateSet.add(maxWager);
+  if (tier1.minWager != null) candidateSet.add(tier1.minWager);
+  if (tier1.lockTieWager != null) candidateSet.add(tier1.lockTieWager);
+  const candidates = [...candidateSet].filter(w => w >= 0 && w <= maxWager).sort((a, b) => a - b);
+
+  const outcomes = {};
+  const results = candidates.map(w => {
+    const [win, strict] = outcomeProbabilities(selfScore, w, pSelf, opponents);
+    outcomes[w] = strict;
+    return [w, win];
+  });
+  const bestProb = Math.max(...results.map(r => r[1]));
+  const tied = results.filter(r => r[1] >= bestProb - 1e-9).map(r => r[0]);
+  // Among wagers tied on win probability (ties for first counted as wins),
+  // prefer whichever wins outright more often, then the smallest wager.
+  // Without this, a wager that only ties the leader looks identical to one
+  // that beats them outright even when the bigger wager costs nothing
+  // extra in expectation (e.g. at 100% confidence). Settling for a
+  // gratuitous tie there is a real defect, not a style choice.
+  tied.sort((a, b) => (outcomes[b] - outcomes[a]) || (a - b));
+  const bestWager = tied[0];
+
+  return { recommendedWager: bestWager, winProbability: bestProb, results, tier1CoverWager: tier1.minWager, tier1LockTie: tier1.lockTieWager, tier1Lockout: tier1.lockout };
+}
+
+function legalMaxDDWager(score, round) {
+  const floor = round === 2 ? 2000 : 1000;
+  return Math.max(score, floor, 0);
+}
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function simulateRestOfGame(scores, playerIndex, remainingClueValues, remainingDDCount, fjConfidence, regularSuccessRate, futureDDFraction, futureDDSuccessRate, rng) {
+  let s = scores.slice();
+  const n = s.length;
+  for (const v of remainingClueValues) {
+    if (rng() < regularSuccessRate) {
+      const winner = Math.floor(rng() * n);
+      s[winner] += v;
+    }
+  }
+  for (let k = 0; k < remainingDDCount; k++) {
+    const finder = Math.floor(rng() * n);
+    const wager = Math.floor(Math.max(s[finder], 0) * futureDDFraction);
+    if (rng() < futureDDSuccessRate) s[finder] += wager; else s[finder] -= wager;
+  }
+  const wagers = s.map((_, i) => {
+    const r = fjTier1(s, i);
+    if (r.lockout) return 0;
+    if (r.lockTieWager != null) return r.lockTieWager;
+    if (r.minWager != null) return r.minWager;
+    return r.maxWager;
+  });
+  for (let i = 0; i < n; i++) {
+    if (rng() < fjConfidence) s[i] += wagers[i]; else s[i] -= wagers[i];
+  }
+  const self = s[playerIndex];
+  const others = s.filter((_, i) => i !== playerIndex);
+  return others.length === 0 ? true : self >= Math.max(...others);
+}
+
+function standardError(p, trials) {
+  return Math.sqrt(Math.max(p * (1 - p), 0) / trials);
+}
+
+// Standard error of the mean paired difference between two candidate wagers
+// evaluated on common random numbers. winsA/winsB are per-trial 0/1 arrays.
+function pairedStandardError(winsA, winsB) {
+  const n = winsA.length;
+  if (n < 2) return 0;
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += winsA[i] - winsB[i];
+  mean /= n;
+  let variance = 0;
+  for (let i = 0; i < n; i++) {
+    const d = (winsA[i] - winsB[i]) - mean;
+    variance += d * d;
+  }
+  variance /= n; // population variance, matching Python statistics.pstdev
+  return Math.sqrt(variance) / Math.sqrt(n);
+}
+
+// Inverse standard-normal CDF (Acklam's rational approximation, ~1e-9).
+// Used for the multiplicity-adjusted band z* = Phi^{-1}(1 - alpha/k).
+function inverseNormalCdf(p) {
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const pl = 0.02425;
+  if (p < pl) {
+    const q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+  }
+  if (p <= 1 - pl) {
+    const q = p - 0.5, r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  const q = Math.sqrt(-2 * Math.log(1 - p));
+  return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+}
+
+function bonferroniZ(numCandidates, alpha) {
+  const k = Math.max(Math.round(numCandidates), 1);
+  let q = 1 - alpha / k;
+  q = Math.min(Math.max(q, 0.5 + 1e-12), 1 - 1e-12);
+  return inverseNormalCdf(q);
+}
+
+// STATISTICAL METHOD (rewritten 2026-07-23, second review; mirrors
+// engine/dd_wager.py). Win probabilities are Monte Carlo estimates computed
+// under common random numbers (CRN): every wager is scored on the SAME
+// replayed rest-of-game randomness within a trial. That makes wagers
+// positively correlated, so a wager is compared to the best using the
+// PAIRED per-trial difference (not the independent formula, which throws
+// away CRN's variance reduction and over-widens the plateau). Because ~k
+// wagers are compared against the empirical best, the band is a
+// multiplicity-adjusted Bonferroni value z* = Phi^{-1}(1 - alpha/k). See
+// RISK_REGISTER.md risk #9 and #10, and the v2 statistical review.
+function ddAnalyze(scores, playerIndex, round, pCorrect, remainingClueValues, remainingDDCount, trials = 3000, zScore = null, alpha = 0.05) {
+  const fjConfidence = 0.5, regularSuccessRate = 0.6, futureDDFraction = 0.5, futureDDSuccessRate = 0.6;
+  const maxWager = legalMaxDDWager(scores[playerIndex], round);
+  const step = Math.max(1, Math.round(maxWager / 24) || 1);
+  const candidateSet = new Set();
+  for (let w = 0; w <= maxWager; w += step) candidateSet.add(w);
+  candidateSet.add(maxWager);
+  const candidates = [...candidateSet].sort((a, b) => a - b);
+
+  // Record the full per-trial win indicator for every wager, so the
+  // comparison variance can be estimated WITH the pairing.
+  const winVectors = {};
+  candidates.forEach(w => winVectors[w] = new Array(trials));
+  const baseRng = mulberry32(20260723);
+
+  for (let t = 0; t < trials; t++) {
+    const trialSeed = Math.floor(baseRng() * 1e9);
+    for (const w of candidates) {
+      const rng = mulberry32(trialSeed);
+      const correct = rng() < pCorrect;
+      const trialScores = scores.slice();
+      trialScores[playerIndex] += correct ? w : -w;
+      winVectors[w][t] = simulateRestOfGame(trialScores, playerIndex, remainingClueValues, remainingDDCount, fjConfidence, regularSuccessRate, futureDDFraction, futureDDSuccessRate, rng) ? 1 : 0;
+    }
+  }
+
+  const results = candidates.map(w => {
+    let s = 0;
+    for (let t = 0; t < trials; t++) s += winVectors[w][t];
+    return [w, s / trials];
+  });
+  const standardErrors = results.map(([w, p]) => [w, standardError(p, trials)]);
+
+  const bestProb = Math.max(...results.map(r => r[1]));
+  const bestWager = Math.min(...results.filter(([, p]) => p === bestProb).map(([w]) => w));
+  const bestVec = winVectors[bestWager];
+
+  const comparisonStandardErrors = results.map(([w]) => [w, pairedStandardError(winVectors[w], bestVec)]);
+  const compSeByWager = Object.fromEntries(comparisonStandardErrors);
+
+  const z = zScore != null ? zScore : bonferroniZ(candidates.length, alpha);
+
+  // Plateau: wagers not statistically distinguishable from the best using
+  // the paired comparison SE and the multiplicity-adjusted band. Recommend
+  // the smallest wager on the plateau.
+  const plateau = [];
+  for (const [w, p] of results) {
+    if (w === bestWager || (bestProb - p) <= z * compSeByWager[w]) plateau.push(w);
+  }
+  plateau.sort((a, b) => a - b);
+  const recommendedWager = Math.min(...plateau);
+
+  return { recommendedWager, winProbability: bestProb, results, standardErrors, comparisonStandardErrors, plateau, zScoreUsed: z, trials };
+}
+
+function approximateClueList(totalBoard, round) {
+  const avg = round === 2 ? 1200 : 600;
+  const n = Math.max(1, Math.round(totalBoard / avg));
+  return Array(n).fill(Math.round(totalBoard / n / 100) * 100);
+}
+
+/* =========================================================
+   UI PLUMBING
+   ========================================================= */
+
+document.querySelectorAll('nav.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('section.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+function wireRadioGroup(id, onChange) {
+  const group = document.getElementById(id);
+  group.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      onChange(btn.dataset.val);
+    });
+  });
+}
+
+function selectedVal(groupId) {
+  return document.querySelector('#' + groupId + ' button.selected').dataset.val;
+}
+
+function confidenceLabel(v) {
+  if (v < 15) return "Never heard of it 😬";
+  if (v < 35) return "Rings a faint bell 🤔";
+  if (v < 55) return "Coin flip 🤷";
+  if (v < 75) return "Pretty sure 🙂";
+  if (v < 92) return "Feeling good 😎";
+  return "Lock it in! 🔒";
+}
+
+function wireConfidenceSlider(sliderId, labelId) {
+  const slider = document.getElementById(sliderId);
+  const label = document.getElementById(labelId);
+  const update = () => { label.textContent = confidenceLabel(+slider.value) + ` (${slider.value}%)`; };
+  slider.addEventListener('input', update);
+  update();
+}
+
+wireConfidenceSlider('dd-confidence', 'dd-confidence-label');
+wireConfidenceSlider('fj-confidence', 'fj-confidence-label');
+
+function updateDDRemainingOptions(val) {
+  // Single Jeopardy has exactly one Daily Double, so if you just found it,
+  // there can't be another one still hidden in that round. Double Jeopardy
+  // has two, so one more can still be out there.
+  const remainSelect = document.getElementById('dd-remaining');
+  const previousValue = remainSelect.value;
+  remainSelect.innerHTML = '<option value="0">None — this is the last one</option>';
+  if (val === '2') {
+    remainSelect.innerHTML += '<option value="1">One more out there</option>';
+  }
+  // Preserve the user's choice if it's still valid for the new round, else reset to 0.
+  remainSelect.value = [...remainSelect.options].some(o => o.value === previousValue) ? previousValue : '0';
+}
+
+wireRadioGroup('dd-round', updateDDRemainingOptions);
+// Run once on load too, so the options are correct even before any click --
+// don't rely on whichever button happens to be marked "selected" in the markup.
+updateDDRemainingOptions(document.querySelector('#dd-round button.selected').dataset.val);
+
+wireRadioGroup('dd-numrivals', (val) => {
+  document.getElementById('dd-rival1-wrap').classList.toggle('hidden', val === '0');
+  document.getElementById('dd-rival2-wrap').classList.toggle('hidden', val !== '2');
+});
+
+// "Money still in play" -- a quick-pick dropdown in round thousands, with
+// an "Exact amount" escape hatch that reveals the precise number input.
+// dd-board (the number input) stays the single source of truth that
+// runDDAnalysis() reads from either way.
+document.getElementById('dd-board-select').addEventListener('change', (e) => {
+  const boardInput = document.getElementById('dd-board');
+  if (e.target.value === 'exact') {
+    boardInput.classList.remove('hidden');
+    boardInput.focus();
+  } else {
+    boardInput.classList.add('hidden');
+    boardInput.value = e.target.value;
+  }
+});
+
+wireRadioGroup('fj-numplayers', (val) => {
+  document.getElementById('fj-p2-wrap').classList.toggle('hidden', val === '1');
+  document.getElementById('fj-p3-wrap').classList.toggle('hidden', val !== '3');
+});
+
+function money(n) {
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(Math.round(n)).toLocaleString();
+}
+
+// Replaces the old dense bar list (one row per candidate wager -- Will's
+// complaint: "i hate the bar graph") with a single curve: win probability
+// against wager size, one gold dot marking the recommendation, and (for the
+// Monte Carlo-based Daily Double engine) a shaded band showing the
+// "plateau" of wagers that are statistically indistinguishable from the
+// best one. A one-line "why" caption underneath explains what the shape
+// means, instead of making the user read percentages off 16+ rows by eye.
+function renderCurveChart(containerId, results, bestWager, opts = {}) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  if (!results || results.length === 0) return;
+
+  const W = 560, H = 190, padL = 48, padR = 16, padT = 16, padB = 26;
+  const wagers = results.map(r => r[0]);
+  const minW = Math.min(...wagers);
+  const maxW = Math.max(...wagers);
+  const span = Math.max(1, maxW - minW);
+
+  const xOf = w => padL + ((w - minW) / span) * (W - padL - padR);
+  const yOf = p => padT + (1 - p) * (H - padT - padB);
+
+  const sorted = [...results].sort((a, b) => a[0] - b[0]);
+  const linePoints = sorted.map(([w, p]) => `${xOf(w).toFixed(1)},${yOf(p).toFixed(1)}`).join(' ');
+
+  let plateauBand = '';
+  if (opts.plateau && opts.plateau.length > 1) {
+    const pMin = Math.min(...opts.plateau);
+    const pMax = Math.max(...opts.plateau);
+    plateauBand = `<rect x="${xOf(pMin).toFixed(1)}" y="${padT}" width="${(xOf(pMax) - xOf(pMin)).toFixed(1)}" height="${H - padT - padB}" fill="var(--jeopardy-gold)" opacity="0.15" />`;
+  }
+
+  const gridLines = [0, 0.5, 1].map(p => `
+    <line x1="${padL}" y1="${yOf(p).toFixed(1)}" x2="${W - padR}" y2="${yOf(p).toFixed(1)}" stroke="#3846d6" stroke-width="1" opacity="0.45" />
+    <text x="${padL - 8}" y="${(yOf(p) + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#cfd4ff">${Math.round(p * 100)}%</text>
+  `).join('');
+
+  const bestEntry = results.find(r => r[0] === bestWager) || sorted[0];
+  const bestX = xOf(bestEntry[0]);
+  const bestY = yOf(bestEntry[1]);
+
+  const xLabelWagers = [...new Set([minW, bestEntry[0], maxW])];
+  const xLabels = xLabelWagers.map(w => `
+    <text x="${xOf(w).toFixed(1)}" y="${H - padB + 15}" text-anchor="middle" font-size="10" fill="#cfd4ff">${money(w)}</text>
+  `).join('');
+
+  const gradId = 'curveGrad-' + containerId;
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; display:block;">
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#3846d6" />
+          <stop offset="100%" stop-color="var(--jeopardy-gold)" />
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      ${plateauBand}
+      <polyline points="${linePoints}" fill="none" stroke="url(#${gradId})" stroke-width="3" stroke-linejoin="round" />
+      <line x1="${bestX.toFixed(1)}" y1="${padT}" x2="${bestX.toFixed(1)}" y2="${H - padB}" stroke="var(--win-green)" stroke-width="1" stroke-dasharray="3,3" opacity="0.6" />
+      <circle cx="${bestX.toFixed(1)}" cy="${bestY.toFixed(1)}" r="6" fill="var(--win-green)" stroke="#04086b" stroke-width="2" />
+      <text x="${bestX.toFixed(1)}" y="${Math.max(12, bestY - 12).toFixed(1)}" text-anchor="middle" font-size="11" font-weight="bold" fill="var(--win-green)">${money(bestEntry[0])} · ${Math.round(bestEntry[1] * 100)}%</text>
+      ${xLabels}
+    </svg>
+    ${opts.explain ? `<div class="curve-explain">${opts.explain}</div>` : ''}
+  `;
+}
+
+/* ---------- Daily Double tab ---------- */
+
+function runDDAnalysis() {
+  const round = +document.querySelector('#dd-round button.selected').dataset.val;
+  const numRivals = +selectedVal('dd-numrivals');
+  const self = +document.getElementById('dd-self').value;
+  const rival1 = +document.getElementById('dd-rival1').value;
+  const rival2 = +document.getElementById('dd-rival2').value;
+  const board = +document.getElementById('dd-board').value;
+  const remainingDD = +document.getElementById('dd-remaining').value;
+  const confidence = +document.getElementById('dd-confidence').value / 100;
+
+  let scores = [self];
+  if (numRivals >= 1) scores.push(rival1);
+  if (numRivals >= 2) scores.push(rival2);
+
+  const clueValues = approximateClueList(board, round);
+  const rec = ddAnalyze(scores, 0, round, confidence, clueValues, remainingDD);
+
+  document.getElementById('dd-results').classList.remove('hidden');
+  document.getElementById('dd-result-amount').textContent = money(rec.recommendedWager);
+
+  const plateauExplain = rec.plateau.length > 1
+    ? `The shaded band is the <strong>plateau</strong>: every wager from ${money(Math.min(...rec.plateau))} to ${money(Math.max(...rec.plateau))} gives a statistically indistinguishable win chance at this simulation size. We recommend the smallest one — there's no evidence the bigger wagers in that band actually do better.`
+    : `No other wager comes close to this one at this simulation size — the curve has a clear single peak here.`;
+  renderCurveChart('dd-bar-chart', rec.results, rec.recommendedWager, { plateau: rec.plateau, explain: plateauExplain });
+
+  const notes = [
+    `At ${Math.round(confidence * 100)}% confidence, this wager gives an estimated ${Math.round(rec.winProbability * 100)}% simulated win rate from here.`,
+    `Legal max wager here is ${money(legalMaxDDWager(self, round))} (the bigger of your score or the round cap).`,
+    `Win probabilities are Monte Carlo estimates (${rec.trials} simulated trials per candidate wager) — small differences between nearby wagers can be simulation noise, not a real edge; that's what the shaded plateau band is showing.`,
+    `This estimate uses simplified placeholder assumptions for the rest of the game (see the "How This Works" tab) — treat it as a guide, not gospel.`
+  ];
+  document.getElementById('dd-notes').innerHTML = notes.map(n => `<li>${n}</li>`).join('');
+
+  document.getElementById('dd-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---------- Final Jeopardy tab ---------- */
+
+function runFJAnalysis() {
+  const numPlayers = +selectedVal('fj-numplayers');
+  const self = +document.getElementById('fj-self').value;
+  const p2 = +document.getElementById('fj-p2').value;
+  const p3 = +document.getElementById('fj-p3').value;
+  const confidence = +document.getElementById('fj-confidence').value / 100;
+
+  let scores = [self];
+  if (numPlayers >= 2) scores.push(p2);
+  if (numPlayers >= 3) scores.push(p3);
+
+  const t1 = fjTier1(scores, 0);
+  const t2 = fjTier2(scores, 0, confidence);
+
+  document.getElementById('fj-results').classList.remove('hidden');
+
+  document.getElementById('fj-tier1-amount').textContent =
+    t1.lockout ? money(0) : (t1.minWager != null ? money(t1.minWager) : `${money(t1.maxWager)} (can't guarantee)`);
+  document.getElementById('fj-tier1-explain').textContent =
+    t1.lockout ? "You're in lockout — no opponent can catch you even if they bet everything and win."
+    : t1.minWager != null ? "The minimum wager that beats every opponent's worst case outright, regardless of confidence."
+    : "Nobody's score covers the leader's worst case — an outright guarantee isn't possible here.";
+
+  document.getElementById('fj-tier2-amount').textContent = money(t2.recommendedWager);
+  document.getElementById('fj-tier2-explain').textContent =
+    `Using your ${Math.round(confidence * 100)}% confidence and a guess at opponent behavior, this maximizes your simulated win rate: ~${Math.round(t2.winProbability * 100)}%.`;
+
+  renderCurveChart('fj-bar-chart', t2.results, t2.recommendedWager, {
+    explain: "The gold dot is Smart Bet's pick. Where several wagers tie on win probability, we break the tie in favor of the smallest wager that still beats every opponent outright rather than merely tying them — a free strict win costs nothing extra here, so there's no reason to settle for a tie."
+  });
+
+  const notes = [
+    "Ties for first count as a win here — the show sends co-champions back for the next game.",
+    "Safe Bet ignores your confidence entirely; Smart Bet uses it, which is why Smart Bet can recommend less.",
+    "Smart Bet's opponent-behavior guess is a labeled placeholder, not fitted to real historical data yet."
+  ];
+  document.getElementById('fj-notes').innerHTML = notes.map(n => `<li>${n}</li>`).join('');
+
+  document.getElementById('fj-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---------- Quiz tab ---------- */
+
+let quizState = null;
+let quizStats = { score: 0, streak: 0, best: 0 };
+
+function loadQuizStats() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('jeopardy-wager-quiz-stats'));
+    if (saved) quizStats = saved;
+  } catch (e) { /* ignore corrupt storage */ }
+  renderQuizStats();
+}
+
+function saveQuizStats() {
+  try { localStorage.setItem('jeopardy-wager-quiz-stats', JSON.stringify(quizStats)); } catch (e) { /* storage unavailable */ }
+}
+
+function renderQuizStats() {
+  document.getElementById('quiz-score').textContent = quizStats.score;
+  document.getElementById('quiz-streak').textContent = quizStats.streak;
+  document.getElementById('quiz-best').textContent = quizStats.best;
+}
+
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function roundTo(n, step) { return Math.round(n / step) * step; }
+
+function newQuizScenario() {
+  document.getElementById('quiz-empty').classList.add('hidden');
+  document.getElementById('quiz-reveal').classList.add('hidden');
+  document.getElementById('quiz-active').classList.remove('hidden');
+  document.getElementById('quiz-wager-input').value = '';
+
+  const isDD = Math.random() < 0.5;
+  const numPlayers = Math.random() < 0.7 ? 3 : 2;
+  const confidence = randInt(15, 95) / 100;
+
+  if (isDD) {
+    const round = Math.random() < 0.5 ? 1 : 2;
+    const self = roundTo(randInt(1000, 12000), 100);
+    const rivals = [roundTo(randInt(1000, 12000), 100)];
+    if (numPlayers === 3) rivals.push(roundTo(randInt(1000, 12000), 100));
+    const board = roundTo(randInt(2000, 12000), 200);
+    const remainingDD = round === 2 ? randInt(0, 1) : 0;
+    const scores = [self, ...rivals];
+
+    quizState = { type: 'dd', scores, round, board, remainingDD, confidence };
+
+    document.getElementById('quiz-kicker').textContent = 'DAILY DOUBLE';
+    document.getElementById('quiz-podiums').innerHTML = podiumsHTML(scores);
+    document.getElementById('quiz-scenario-text').textContent =
+      `${round === 1 ? 'Single' : 'Double'} Jeopardy. ${money(board)} left on the board. ` +
+      (remainingDD ? 'One more Daily Double still hidden.' : 'This is the last Daily Double.');
+    document.getElementById('quiz-flavor').textContent = `You're feeling a ${Math.round(confidence * 100)}% on this category. What's your wager?`;
+  } else {
+    const self = roundTo(randInt(3000, 20000), 100);
+    const rivals = [roundTo(randInt(1000, 20000), 100)];
+    if (numPlayers === 3) rivals.push(roundTo(randInt(1000, 20000), 100));
+    const scores = [self, ...rivals];
+
+    quizState = { type: 'fj', scores, confidence };
+
+    document.getElementById('quiz-kicker').textContent = 'FINAL JEOPARDY';
+    document.getElementById('quiz-podiums').innerHTML = podiumsHTML(scores);
+    document.getElementById('quiz-scenario-text').textContent = `Final Jeopardy, ${numPlayers} players.`;
+    document.getElementById('quiz-flavor').textContent = `You're feeling a ${Math.round(confidence * 100)}% on this category. What's your wager?`;
+  }
+}
+
+function podiumsHTML(scores) {
+  const labels = ['YOU', 'RIVAL 1', 'RIVAL 2'];
+  return scores.map((s, i) =>
+    `<div class="podium ${i === 0 ? 'you' : ''}"><div class="who">${labels[i]}</div><div class="amt">${money(s)}</div></div>`
+  ).join('');
+}
+
+function submitQuizWager() {
+  const input = document.getElementById('quiz-wager-input');
+  const userWager = +input.value;
+  if (isNaN(userWager) || input.value.trim() === '') return;
+
+  let optimal, userProb, optimalProb, results, plateau;
+
+  if (quizState.type === 'dd') {
+    const clueValues = approximateClueList(quizState.board, quizState.round);
+    const rec = ddAnalyze(quizState.scores, 0, quizState.round, quizState.confidence, clueValues, quizState.remainingDD);
+    optimal = rec.recommendedWager;
+    optimalProb = rec.winProbability;
+    results = rec.results;
+    plateau = rec.plateau;
+    const maxW = legalMaxDDWager(quizState.scores[0], quizState.round);
+    const clamped = Math.max(0, Math.min(userWager, maxW));
+    const match = results.reduce((best, r) => Math.abs(r[0] - clamped) < Math.abs(best[0] - clamped) ? r : best, results[0]);
+    userProb = match[1];
+  } else {
+    const rec = fjTier2(quizState.scores, 0, quizState.confidence);
+    optimal = rec.recommendedWager;
+    optimalProb = rec.winProbability;
+    results = rec.results;
+    const maxW = legalMaxWager(quizState.scores[0]);
+    const clamped = Math.max(0, Math.min(userWager, maxW));
+    const match = results.reduce((best, r) => Math.abs(r[0] - clamped) < Math.abs(best[0] - clamped) ? r : best, results[0]);
+    userProb = match[1];
+  }
+
+  const ratio = optimalProb > 0 ? Math.min(1, userProb / optimalProb) : 1;
+  const pct = Math.round(ratio * 100);
+
+  document.getElementById('quiz-active').classList.add('hidden');
+  document.getElementById('quiz-reveal').classList.remove('hidden');
+
+  const gradeEl = document.getElementById('quiz-grade');
+  let grade, cls, flavor;
+  if (pct >= 97) { grade = 'A+'; cls = 'win'; flavor = "Perfect. Alex would nod."; }
+  else if (pct >= 85) { grade = 'A'; cls = 'win'; flavor = "Sharp wager — barely left anything on the table."; }
+  else if (pct >= 65) { grade = 'B'; cls = 'mid'; flavor = "Solid, but there was more equity available."; }
+  else if (pct >= 40) { grade = 'C'; cls = 'mid'; flavor = "Playing it safe cost you there."; }
+  else { grade = 'D'; cls = 'bad'; flavor = "Ouch. That wager left a lot of win probability on the board."; }
+
+  gradeEl.textContent = grade;
+  gradeEl.className = 'grade ' + cls;
+  document.getElementById('quiz-reveal-text').innerHTML =
+    `You wagered <strong>${money(userWager)}</strong> (~${Math.round(userProb * 100)}% win rate). ` +
+    `Optimal was <strong>${money(optimal)}</strong> (~${Math.round(optimalProb * 100)}% win rate). ` +
+    `That's <strong>${pct}%</strong> of the value on the table.<br><span class="flavor">${flavor}</span>`;
+
+  renderCurveChart('quiz-bar-chart', results, optimal, {
+    plateau,
+    explain: `The gold dot marks the optimal wager (${money(optimal)}); your wager was ${money(userWager)}. The curve shows how win probability changes as the wager size changes — the flatter the curve near your bet, the less it actually cost you to be off.`
+  });
+
+  quizStats.score += Math.round(pct / 10);
+  if (pct >= 85) {
+    quizStats.streak += 1;
+    quizStats.best = Math.max(quizStats.best, quizStats.streak);
+    if (quizStats.streak >= 3) fireConfetti();
+  } else {
+    quizStats.streak = 0;
+  }
+  renderQuizStats();
+  saveQuizStats();
+}
+
+function fireConfetti() {
+  const colors = ['#FFCC00', '#ffffff', '#3846d6', '#2ecc71'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + 'vw';
+    piece.style.background = colors[randInt(0, colors.length - 1)];
+    piece.style.animationDuration = (2 + Math.random() * 1.5) + 's';
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 4000);
+  }
+}
+
+loadQuizStats();
+</script>
+
+</body>
+</html>

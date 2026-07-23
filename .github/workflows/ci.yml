@@ -1,0 +1,40 @@
+name: CI
+
+# Runs the test suite on every push and pull request, per the project
+# standard that "a standard that is not checked is only a preference."
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  python-tests:
+    name: Python engine tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pytest
+        run: python -m pip install --upgrade pip pytest
+      - name: Run the hand-derived + invariant test suite
+        run: python -m pytest tests/ -v
+
+  js-parity:
+    name: JS/Python engine parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check the app's JS engine against the Python hand-derived values
+        run: node tests/js_parity.js
