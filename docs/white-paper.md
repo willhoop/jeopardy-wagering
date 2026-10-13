@@ -1,6 +1,6 @@
 # Jeopardy! Wagering Strategy: A Practical Model for Daily Double and Final Jeopardy Bets
 
-Version 2.1 — 2026-10-13 (Version 2.1 recalibrates the simulated rivals to
+Version 2.1.1 — 2026-10-13 (2.1.1 adds only a thesis link in llms.txt. Version 2.1 recalibrates the simulated rivals to
 modern-era play; figures change, the question does not.)
 
 ## Abstract

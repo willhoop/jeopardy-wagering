@@ -8,6 +8,7 @@ Keywords: Jeopardy!, Final Jeopardy, Daily Double, wagering strategy, game theor
 
 - [App](https://willhoop.github.io/jeopardy-wagering/app/)
 - [White paper (PDF)](https://github.com/willhoop/jeopardy-wagering/blob/main/build/white-paper.pdf)
+- [Thesis: why strong players underwager (PDF)](https://github.com/willhoop/jeopardy-wagering/blob/main/build/thesis-underwagering.pdf)
 - [Slide deck (PDF)](https://github.com/willhoop/jeopardy-wagering/blob/main/build/deck.pdf)
 - [Technical docs](https://github.com/willhoop/jeopardy-wagering/blob/main/docs/README.md)
 - [Source](https://github.com/willhoop/jeopardy-wagering)

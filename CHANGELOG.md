@@ -4,6 +4,20 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/). Dates are ISO 8601.
 
+## [2.1.1] - 2026-10-13
+
+### Added
+
+- `llms.txt` links the underwagering thesis, so agents can find it. The
+  portfolio card keeps its five fixed link slots.
+
+### Record
+
+- **Measured.** Nothing.
+- **Basis.** unchanged.
+- **Supersedes.** Nothing.
+- **Owed to the next major.** Nothing.
+
 ## [2.1.0] - 2026-10-13
 
 The simulated rivals now play like modern-era contestants. Tesauro et al.
