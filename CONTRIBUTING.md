@@ -10,7 +10,8 @@ built on and which parts are published versus assumed. Changes to the
 engine should either preserve the existing guarantees (Tier 1) or be
 explicit about which assumptions they're changing (Tier 2 / Daily Double).
 Every opponent-behavior value lives in the configuration block of
-`engine/behavior.py`, marked PUBLISHED or ASSUMED (ADR-0003).
+`engine/behavior.py`, marked CALIBRATED, PUBLISHED or ASSUMED (ADR-0003,
+ADR-0004).
 
 ## Making a change
 
@@ -42,9 +43,15 @@ Every opponent-behavior value lives in the configuration block of
 
 - Never embed raw rows from a scraped or restricted historical dataset in
   a shipped file -- see `docs/adr/0001-data-source-strategy.md`.
+- Never commit or quote J! Archive data. Its terms forbid republishing
+  data collected or derived from it. Keep calibration notes in
+  `data/private/` (excluded by `.gitignore`). No document, commit message,
+  changelog entry or slide may state a J! Archive statistic or a CALIBRATED
+  value from `engine/behavior.py`; name the constant and point to the file
+  instead. See `docs/adr/0004-modern-era-calibration.md`.
 - Never silently rewrite a prior conclusion in the white paper or an ADR.
   Add new information and state what changed and why, so the history stays
   legible.
 - Never present a Tier 2 / Daily Double win-probability number as a
-  validated statistic. It is a model output that rests on the assumed
-  values in `engine/behavior.py` (see ADR-0003).
+  validated statistic. It is a model output that rests on the calibrated
+  and assumed values in `engine/behavior.py` (see ADR-0003 and ADR-0004).

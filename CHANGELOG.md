@@ -4,6 +4,54 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/). Dates are ISO 8601.
 
+## [2.1.0] - 2026-10-13
+
+The simulated rivals now play like modern-era contestants. Tesauro et al.
+(2013) describes 1990s-2012 play, before the shift to Daily Double hunting
+and aggressive betting.
+
+### Changed
+
+- `engine/behavior.py` and the app's `BEHAVIOR` block: Final Jeopardy
+  accuracy now depends on score rank; the outcome correlation, the leader's
+  cover share, Daily Double accuracy, the future-DD wager fraction (now by
+  round) and the future-DD finder (now weighted by score rank) are
+  calibrated to Seasons 38-41 (2021-2025). Values are marked CALIBRATED.
+- Daily Double rollouts: a future Daily Double falls at a random point among
+  the remaining clues, not after all of them.
+- `fj_bestresponse.analyze(opponent_correctness=None)` and
+  `RolloutConfig(opponent_fj_accuracy=None)` now mean "by score rank".
+  `RolloutConfig` gains `round_number`; `dd_wager.analyze` sets it.
+
+### Added
+
+- `docs/adr/0004-modern-era-calibration.md`: the calibration was done
+  privately on J! Archive season statistics. Their terms forbid republishing
+  the data, so no source statistic appears in this repository or its
+  documents. The ADR records the accepted terms-of-use risk.
+- 3 tests: accuracy by score rank, finder frequencies, future-DD wager
+  fraction by round.
+- `docs/thesis/underwagering.md` (+ PDF): a separate thesis on why strong
+  players underwager. It sets the claim against the counter-evidence
+  (cognitive ability goes with less risk aversion, not more), measures the
+  cost of underwagering with this engine, and states when betting less is
+  right (including Jeopardy! Masters' 3/1/0 match points).
+
+### Record
+
+- **Measured.** Tier 2 and Daily Double recommendations and win
+  percentages, from `engine/fj_bestresponse.py`, `engine/dd_wager.py` and
+  the app. Example: leader 10,000 vs 8,000 vs 3,400 at 89% confidence still
+  bets $6,001; win share 0.913.
+- **Basis.** unchanged. Same question (win share against simulated
+  contestants, tiebreaker rule) and same model structure; the parameters
+  are re-estimated for the modern era.
+- **Supersedes.** ~~91.7%~~ retracted (now 91.3%). Every 2.0.0 Tier 2 and
+  Daily Double figure in the white paper, deck and technical docs is
+  replaced in this release, because a figure that is no longer true does
+  not wait.
+- **Owed to the next major.** Nothing.
+
 ## [2.0.0] - 2026-10-13
 
 Smart Bet now plays against simulated contestants and scores ties the way the

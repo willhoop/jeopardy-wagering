@@ -67,7 +67,8 @@ check('winShare nobody wins at $0', winShare([0, 0, 0], 0) === 0);
   check('B published regime weights', Object.keys(exp).length === Object.keys(d).length &&
     Object.entries(exp).every(([w, p]) => approx(d[w], p, 1e-12)), JSON.stringify(d));
   const a = Object.fromEntries(wagerDistribution([10000, 8000, 3000], 0));
-  check('A cover weights', approx(a[6001], 0.75, 1e-12) && approx(a[6000], 0.10, 1e-12) && approx(a[10000], 0.07, 1e-12));
+  check('A cover weights', approx(a[6001], 0.80, 1e-12) && approx(a[6000], 0.04, 1e-12) && approx(a[10000], 0.064, 1e-12));
+  check('FJ accuracy follows score rank', fjAccuracy([3400, 10000, 8000], 1) === 0.51 && fjAccuracy([3400, 10000, 8000], 2) === 0.46 && fjAccuracy([3400, 10000, 8000], 0) === 0.40);
   const lock = Object.fromEntries(wagerDistribution([20000, 8000], 0));
   check('A lockout weights', lock[0] === 0.5 && lock[3999] === 0.5);
 }

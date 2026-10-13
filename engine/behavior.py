@@ -14,8 +14,10 @@ Sources:
         clue. Before that date, tied players both returned as co-champions.
         https://www.theringer.com/2021/01/23/tv/jeopardy-tiebreaker-scenario-rules-changes
 
-Every value is marked PUBLISHED (from a source) or ASSUMED (our choice,
-where the source gives no number). See docs/adr/0003-simulated-contestant-behavior.md.
+Every value is marked CALIBRATED (fitted privately to modern-era data,
+see ADR-0004), PUBLISHED (from a cited source) or ASSUMED (our choice).
+See docs/adr/0003-simulated-contestant-behavior.md and
+docs/adr/0004-modern-era-calibration.md.
 """
 
 import math
@@ -33,20 +35,40 @@ WagerDist = List[Tuple[int, float]]
 # If every player finishes at $0 or less, nobody wins.
 TIEBREAKER_RULE = True
 
-# Final Jeopardy accuracy [T13 s2.3], PUBLISHED.
-FJ_ACCURACY_AVERAGE = 0.50
-FJ_ACCURACY_CHAMPION = 0.60
-# Right/wrong outcomes are positively correlated across players [T13 s2.3],
-# PUBLISHED as a correlation of about 0.3. We read this as the correlation
-# of the binary outcomes at 50% accuracy, and convert it to the latent
-# normal correlation with Sheppard's formula: r = sin(0.3 * pi / 2).
-FJ_OUTCOME_CORRELATION = 0.30
+# ERA. Contestant behavior changed sharply in the 2010s (Daily Double
+# hunting, aggressive betting). Values marked CALIBRATED come from a private
+# calibration on J! Archive season statistics for Seasons 38-41 (2021-2025).
+# J! Archive's terms forbid republishing its data, so the source statistics
+# are not kept in this repository and are not quoted in any document
+# (ADR-0004). Values marked PUBLISHED [T13] describe 1990s-2012 play and are
+# kept only where no modern calibration exists.
 
-# Daily Double accuracy for an average contestant [T13 s2.2], PUBLISHED.
-DD_ACCURACY_AVERAGE = 0.64
+# Final Jeopardy accuracy by score rank entering FJ (leader, second, third).
+# CALIBRATED.
+FJ_ACCURACY_BY_RANK = (0.51, 0.46, 0.40)
+# Average over all players. CALIBRATED. Used for the advised player's own
+# Final Jeopardy inside Daily Double rollouts.
+FJ_ACCURACY_OVERALL = 0.45
+# Right/wrong outcomes are positively correlated across players. CALIBRATED
+# as the pairwise correlation of the binary outcomes. We convert it to the
+# latent normal correlation with Sheppard's formula, r = sin(rho * pi / 2),
+# which is exact at 50% accuracy and close to it nearby.
+FJ_OUTCOME_CORRELATION = 0.16
+
+# Daily Double accuracy. CALIBRATED.
+DD_ACCURACY = 0.65
+# A future Daily Double's wager, as a fraction of the finder's score, by
+# round. Round 2 uses the second Double Jeopardy! DD, because a DD still
+# hidden after the current one is usually that one. CALIBRATED.
+DD_WAGER_FRACTION_BY_ROUND = {1: 0.87, 2: 0.46}
+# Who finds a future Daily Double, by score rank. CALIBRATED from finds by
+# lectern; the returning champion's lectern stands in for the leader.
+DD_FINDER_WEIGHTS_BY_RANK = (0.41, 0.30, 0.29)
 
 # Second-place ("B") wager mix. PUBLISHED [T13 s2.3] for the regime
-# B >= 3/4 A and B >= 2C. ASSUMED to hold in the other five regimes: when a
+# B >= 3/4 A and B >= 2C, from 1990s-2012 games: no modern calibration
+# exists, so this is the oldest part of the model. ASSUMED to hold in the
+# other five regimes and in the modern era: when a
 # bet type does not exist in a regime, its weight is shared out
 # proportionally among the bet types that do.
 B_WEIGHTS = {
@@ -57,13 +79,14 @@ B_WEIGHTS = {
     "random": 0.24,      # spread over the random grid below
 }
 
-# Leader ("A") wager mix, not locked out. ASSUMED. [T13 s1.1] says A
-# "usually bets at least 2B-A (frequently 2B-A+1)" but gives no split.
+# Leader ("A") wager mix, not locked out. The share that covers second
+# place (cover + cover_tie + bankroll, plus the covering part of "random")
+# is CALIBRATED. The split between the bet types is ASSUMED.
 A_WEIGHTS = {
-    "cover": 0.75,       # 2B - A + 1
-    "cover_tie": 0.10,   # 2B - A
-    "bankroll": 0.05,
-    "random": 0.10,
+    "cover": 0.80,       # 2B - A + 1
+    "cover_tie": 0.04,   # 2B - A
+    "bankroll": 0.04,
+    "random": 0.12,
 }
 # Leader in a lockout (A > 2B). ASSUMED split.
 A_LOCKOUT_WEIGHTS = {"zero": 0.5, "max_safe": 0.5}
@@ -216,6 +239,31 @@ def wager_distribution(scores: Sequence[int], player_index: int) -> WagerDist:
         })
 
     return _mix(me, {"random": 1.0}, {})
+
+
+def score_rank(scores: Sequence[int], player_index: int) -> int:
+    """0 for the leader, 1 for second, 2 for third (ties: lower index first)."""
+    return _roles(scores).index(player_index)
+
+
+def fj_accuracy(scores: Sequence[int], player_index: int) -> float:
+    """Final Jeopardy accuracy for a simulated contestant, by score rank."""
+    rank = min(score_rank(scores, player_index), len(FJ_ACCURACY_BY_RANK) - 1)
+    return FJ_ACCURACY_BY_RANK[rank]
+
+
+def sample_dd_finder(scores: Sequence[int], rng: random.Random) -> int:
+    """Pick who finds a future Daily Double, weighted by score rank."""
+    order = _roles(scores)
+    weights = [DD_FINDER_WEIGHTS_BY_RANK[min(k, len(DD_FINDER_WEIGHTS_BY_RANK) - 1)]
+               for k in range(len(order))]
+    u = rng.random() * sum(weights)
+    acc = 0.0
+    for k, w in enumerate(weights):
+        acc += w
+        if u < acc:
+            return order[k]
+    return order[-1]
 
 
 # --- Correlated right/wrong outcomes ----------------------------------------

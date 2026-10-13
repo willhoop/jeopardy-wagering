@@ -59,3 +59,21 @@ def test_simulate_final_jeopardy_cover_bet_player_wagers_and_can_lose():
     rng = random.Random(2)
     result = simulate.simulate_final_jeopardy([9000, 5000], 0, fj_confidence=0.0, rng=rng)
     assert result[0] == 9000 - 1001
+
+
+def test_future_daily_double_wager_fraction_depends_on_round():
+    # Only player 0 has money, so only player 0 can change score. With
+    # success_rate=1.0 a found DD adds score * fraction:
+    #   round 1: 10000 * 0.87 = 8700 -> 18700; round 2: 0.46 -> 14600.
+    # (Players at $0 who find it wager $0.)
+    import behavior
+    for rnd, expected in ((1, 10000 + int(10000 * behavior.DD_WAGER_FRACTION_BY_ROUND[1])),
+                          (2, 10000 + int(10000 * behavior.DD_WAGER_FRACTION_BY_ROUND[2]))):
+        seen = set()
+        for seed in range(40):
+            out = simulate.simulate_future_daily_doubles(
+                [10000, 0, 0], 1, success_rate=1.0, rng=random.Random(seed), round_number=rnd)
+            seen.add(out[0])
+        assert seen <= {10000, expected}
+        assert expected in seen
+    assert 10000 + int(10000 * 0.87) == 18700 and 10000 + int(10000 * 0.46) == 14600

@@ -1,6 +1,7 @@
 # ADR-0003: Simulated contestant behavior and the tiebreaker rule
 
-Status: accepted. Supersedes ADR-0002.
+Status: accepted. Supersedes ADR-0002. Its accuracy, correlation, leader-cover
+and Daily Double values are superseded by ADR-0004 (modern-era calibration).
 Date: 2026-10-13
 
 ## Context

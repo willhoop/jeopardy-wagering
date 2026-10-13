@@ -52,14 +52,37 @@ def test_b_two_player_redistributes_missing_bet_types():
 
 
 def test_a_cover_and_lockout():
-    # A=10000, B=8000: cover 6001 (.75), tie 6000 (.10), all-in 10000 (.05),
-    # grid {0, 2500, 5000, 7500, 10000} at .02 each.
+    # A=10000, B=8000: cover 6001 (.80), tie 6000 (.04), all-in 10000 (.04),
+    # grid {0, 2500, 5000, 7500, 10000} at .12/5 = .024 each.
+    # 10000 total: .04 + .024 = .064.
     d = as_dict(behavior.wager_distribution([10000, 8000, 3000], 0))
-    assert abs(d[6001] - 0.75) < 1e-12
-    assert abs(d[6000] - 0.10) < 1e-12
-    assert abs(d[10000] - 0.07) < 1e-12
+    assert abs(d[6001] - 0.80) < 1e-12
+    assert abs(d[6000] - 0.04) < 1e-12
+    assert abs(d[10000] - 0.064) < 1e-12
     # Lockout A=20000 > 2*8000: 0 or 20000-16000-1 = 3999, half each.
     assert as_dict(behavior.wager_distribution([20000, 8000], 0)) == {0: 0.5, 3999: 0.5}
+
+
+def test_fj_accuracy_follows_score_rank():
+    # [3400, 10000, 8000]: index 1 leads, index 2 is second, index 0 third.
+    scores = [3400, 10000, 8000]
+    assert behavior.fj_accuracy(scores, 1) == behavior.FJ_ACCURACY_BY_RANK[0]
+    assert behavior.fj_accuracy(scores, 2) == behavior.FJ_ACCURACY_BY_RANK[1]
+    assert behavior.fj_accuracy(scores, 0) == behavior.FJ_ACCURACY_BY_RANK[2]
+
+
+def test_dd_finder_frequencies_match_rank_weights():
+    # Leader is index 2 here; sampled shares should match the weights.
+    rng = random.Random(3)
+    scores = [1000, 2000, 5000]
+    n = 30000
+    counts = [0, 0, 0]
+    for _ in range(n):
+        counts[behavior.sample_dd_finder(scores, rng)] += 1
+    w = behavior.DD_FINDER_WEIGHTS_BY_RANK
+    total = sum(w)
+    for idx, rank in ((2, 0), (1, 1), (0, 2)):
+        assert abs(counts[idx] / n - w[rank] / total) < 0.012  # ~4 SE
 
 
 def test_c_is_state_independent_and_non_positive_scores_do_not_bet():

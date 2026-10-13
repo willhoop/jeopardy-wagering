@@ -12,8 +12,9 @@ wins at $0. See engine/behavior.py.
 
 Opponents follow the simulated contestant behavior in engine/behavior.py:
 role-based wager mixes (leader, second, third) anchored on Tesauro et al.
-(2013), 50% accuracy, and right/wrong outcomes that are correlated across
-all players (a hard clue is hard for everyone). The result is exact: we
+(2013) and calibrated to modern-era play (ADR-0004), accuracy by score
+rank, and right/wrong outcomes that are correlated across all players (a
+hard clue is hard for everyone). The result is exact: we
 integrate over the shared difficulty factor and enumerate every wager and
 right/wrong branch, so there is no sampling noise.
 """
@@ -27,7 +28,6 @@ import fj_wager
 
 WagerDist = behavior.WagerDist
 
-DEFAULT_OPPONENT_CORRECTNESS = behavior.FJ_ACCURACY_AVERAGE
 DEFAULT_CORRELATION = behavior.FJ_OUTCOME_CORRELATION
 
 
@@ -40,7 +40,7 @@ def default_opponent_wager_model(scores: Sequence[int], opponent_index: int) -> 
 class OpponentModel:
     score: int
     wager_dist: WagerDist
-    p_correct: float = DEFAULT_OPPONENT_CORRECTNESS
+    p_correct: float = behavior.FJ_ACCURACY_OVERALL
 
 
 @dataclass
@@ -133,11 +133,15 @@ def analyze(
     player_index: int,
     p_self_correct: float,
     opponent_model_fn: Callable[[Sequence[int], int], WagerDist] = default_opponent_wager_model,
-    opponent_correctness: float = DEFAULT_OPPONENT_CORRECTNESS,
+    opponent_correctness: Optional[float] = None,
     correlation: float = DEFAULT_CORRELATION,
     wager_step: int = 100,
 ) -> FJBestResponse:
-    """Search for the wager with the highest expected win share."""
+    """Search for the wager with the highest expected win share.
+
+    `opponent_correctness=None` gives each opponent the calibrated accuracy
+    for their score rank; a float gives every opponent that accuracy.
+    """
     if not 0 <= player_index < len(scores):
         raise ValueError("player_index out of range")
 
@@ -148,7 +152,8 @@ def analyze(
         OpponentModel(
             score=s,
             wager_dist=opponent_model_fn(scores, i),
-            p_correct=opponent_correctness,
+            p_correct=(behavior.fj_accuracy(scores, i)
+                       if opponent_correctness is None else opponent_correctness),
         )
         for i, s in enumerate(scores)
         if i != player_index
@@ -175,10 +180,11 @@ def analyze(
     notes = [
         "Ties for first go to a tiebreaker clue (rule since November 2014), "
         "scored as an equal share of the win.",
-        "Opponents follow simulated contestant behavior anchored on Tesauro "
-        "et al. (2013) -- see engine/behavior.py and ADR-0003.",
-        f"Opponent accuracy {opponent_correctness:.0%}, outcome correlation "
-        f"{correlation:.2f} across all players.",
+        "Opponents follow simulated contestant behavior, calibrated to "
+        "modern-era play -- see engine/behavior.py, ADR-0003 and ADR-0004.",
+        "Opponent accuracy: "
+        + ("by score rank" if opponent_correctness is None else f"{opponent_correctness:.0%}")
+        + f"; outcome correlation {correlation:.2f} across all players.",
     ]
 
     return FJBestResponse(

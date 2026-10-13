@@ -1,8 +1,7 @@
 # Jeopardy! Wagering Strategy: A Practical Model for Daily Double and Final Jeopardy Bets
 
-Version 2.0 — 2026-10-13 (Version 2.0 changes the tie rule and the Tier 2
-opponent model, so every Tier 2 and Daily Double figure from 1.x is replaced
-and is not comparable with the figures here.)
+Version 2.1 — 2026-10-13 (Version 2.1 recalibrates the simulated rivals to
+modern-era play; figures change, the question does not.)
 
 ## Abstract
 
@@ -11,8 +10,8 @@ wagering-strategy tool for Jeopardy!'s two decision points that carry real
 stakes: the Daily Double and Final Jeopardy. It covers three things in one
 place: what's already known about optimal wagering (from a peer-reviewed
 source and from expert practitioner writing), the exact math this project
-built on top of that foundation, and what is published versus what is our
-own assumption. The intent is that a reader can verify every claim here
+built on top of that foundation, and which inputs are published, which are
+calibrated privately, and which are our own assumption. The intent is that a reader can verify every claim here
 against either a citation or a worked example, not take it on faith.
 
 **Correction (2.0.0).** Versions before 2.0 scored a tie for first as a full
@@ -26,6 +25,17 @@ paper. The visible symptom was a leader told to bet \$6,000, a bet that only
 ties second place, when the \$6,001 cover bet wins outright (section 5.4).
 Version 2.0 also replaces the 1.x placeholder opponent model (ADR-0002) with
 simulated contestant behavior (ADR-0003, section 5.3).
+
+**Change in 2.1.** Version 2.0 took opponent accuracy, the outcome
+correlation, the leader's cover rate and all Daily Double behavior from
+Tesauro et al. (2013), whose data end in 2012. Play changed in the 2010s:
+contestants now hunt Daily Doubles and bet them much harder. Version 2.1
+recalibrates those inputs to Seasons 38-41 (2021-2025), privately, on J!
+Archive season statistics whose terms forbid republication (ADR-0004,
+section 3). Final Jeopardy accuracy now depends on score rank, and a future
+Daily Double now falls at a random point among the remaining clues instead
+of after all of them. Every 2.0 Tier 2 and Daily Double figure is replaced
+by a rerun of the 2.1 engine. The question each figure answers is the same.
 
 ## 1. Motivation and scope
 
@@ -98,24 +108,31 @@ an empirically-fitted model of how real opponents actually wager. This
 project follows the same two-layer structure: a guarantee-based layer that
 needs no behavioral assumptions (Tier 1), and a best-response layer that
 does (Tier 2 / the DD engine). Every behavioral number in the second layer
-is labeled PUBLISHED (taken from Tesauro et al.) or ASSUMED (our choice where
-the paper gives no number), since this project has not done the paper's
-scale of empirical fitting.
+is labeled CALIBRATED (set privately from modern-era season statistics,
+ADR-0004), PUBLISHED (taken from Tesauro et al., 1990s-2012 play, kept only
+where no modern source exists) or ASSUMED (our choice where no source gives
+a number).
 
 ## 3. Data and sourcing decision
 
-Summarized from ADR-0001 (`docs/adr/0001-data-source-strategy.md`):
+Summarized from ADR-0001 (`docs/adr/0001-data-source-strategy.md`), as
+amended by ADR-0004 (`docs/adr/0004-modern-era-calibration.md`):
 
 | Source | Used for | Restriction |
 |---|---|---|
-| J-Archive itself | Nothing (not scraped) | Site terms forbid scraping/republication |
+| J! Archive per-season statistics pages, Seasons 38-41 | Private calibration of the CALIBRATED model values; read by hand, one page per season, no scraping | Site terms forbid scraping and forbid republishing data collected or derived from J! Archive |
+| J! Archive game pages | Nothing (not scraped) | Same terms |
 | jwolle1/jeopardy_clue_dataset | Nothing shipped; internal validation only, if used at all | README forbids public-facing product use |
-| J-Archive's own Wagering Calculator | Reference point to sanity-check against | N/A — a tool, not a data source |
-| Tesauro et al. (2013), JAIR | Calibration numbers cited in this paper | None — published research |
+| J! Archive's own Wagering Calculator | Reference point to sanity-check against | N/A — a tool, not a data source |
+| Tesauro et al. (2013), JAIR | PUBLISHED values cited in this paper (1990s-2012 play) | None — published research |
 
-**Decision:** anything that ships — this paper, the app, the deck — cites
-only the Tesauro et al. published statistics. Nothing here is built by
-scraping J-Archive or by embedding a restricted dataset.
+**Decision:** this paper, the app and the deck cite only the Tesauro et al.
+published statistics. The modern-era source statistics are not kept in the
+repository and are not quoted, tabulated or paraphrased as numbers in any
+document. This paper describes the CALIBRATED values in words only; the
+method is in `engine/behavior.py` and ADR-0004. The values themselves are
+model settings in the engine and the app, which is an accepted
+terms-of-use risk (section 8).
 
 ## 4. Final Jeopardy, Tier 1: guarantee-based wagering
 
@@ -268,14 +285,18 @@ difficulty. Given `F = f`, players are independent, with
 p_i(f) = Phi( (Phi^{-1}(p_i) - sqrt(r) * f) / sqrt(1 - r) )
 ```
 
-The published correlation is about 0.3 (Tesauro et al., 2013, section 2.3).
-We read it as the correlation of the binary right/wrong outcomes at 50%
-accuracy and convert it to the latent correlation with Sheppard's formula
-(Sheppard, 1899), `rho_binary = (2/pi) * arcsin(r)`, so
+The correlation is CALIBRATED to modern-era play (ADR-0004). It is lower
+than the value Tesauro et al. (2013, section 2.3) report for 1990s-2012
+games. We read it as the correlation of the binary right/wrong outcomes and
+convert it to the latent correlation with Sheppard's formula (Sheppard,
+1899), `rho_binary = (2/pi) * arcsin(r)`, so
 
 ```
-r = sin(0.3 * pi / 2) = 0.4540
+r = sin(rho_binary * pi / 2)
 ```
+
+The formula is exact at 50% accuracy and approximate elsewhere (section 8).
+Each opponent's `p_i` is the CALIBRATED accuracy for their score rank.
 
 The expected win share is
 
@@ -294,7 +315,8 @@ it. The user's share against that is 1 (strictly ahead and above \$0),
 step 0.25 (49 nodes), with the normal density weights normalized to sum to
 1. There is no sampling, so there is no sampling error. The result is
 computed in IEEE-754 double precision. On the one hand-derived correlated
-case (section 7), the quadrature result differs from the exact value by
+case (section 7, which uses an illustrative binary correlation of 0.3 as an
+explicit input), the quadrature result differs from the exact value by
 1.4e-10.
 
 **Search.** The engine evaluates every \$100 from \$0 to the legal maximum,
@@ -311,19 +333,24 @@ function itself prefers the cover bet.
 
 All values below live in one configuration block in `engine/behavior.py`
 (mirrored in the `BEHAVIOR` object in `app/index.html`). Full decision
-record: `docs/adr/0003-simulated-contestant-behavior.md`. Each opponent is
-given a role by score: leader (A), second (B), third (C).
+record: `docs/adr/0003-simulated-contestant-behavior.md`, with the
+modern-era recalibration in `docs/adr/0004-modern-era-calibration.md`. Each
+opponent is given a role by score: leader (A), second (B), third (C).
+
+CALIBRATED values are described in words only. Their source statistics
+cannot be republished (section 3); the method is in `engine/behavior.py`
+and ADR-0004.
 
 | Quantity | Value | Status |
 |---|---|---|
-| B wager mix | all-in 26%; keep C out (bet below B-2C, or cover with 2C-B+1) 27%; overtake A (A-B+1) 15%; two-thirds (3B-2A-1) 8%; random 24% | PUBLISHED for the regime B >= 3/4 A and B >= 2C (T13 section 2.3). ASSUMED to hold in the other five regimes. |
-| A wager mix, not locked out | cover 2B-A+1 75%; tie-cover 2B-A 10%; all-in 5%; random 10% | ASSUMED. T13 section 1.1 says A usually bets at least 2B-A, with no split. |
+| B wager mix | all-in 26%; keep C out (bet below B-2C, or cover with 2C-B+1) 27%; overtake A (A-B+1) 15%; two-thirds (3B-2A-1) 8%; random 24% | PUBLISHED from 1990s-2012 games, for the regime B >= 3/4 A and B >= 2C (T13 section 2.3). No modern source exists. ASSUMED to hold in the other five regimes and in the modern era. |
+| A wager mix, not locked out | the cover bet 2B-A+1 most of the time; small shares for the tie-cover 2B-A, all-in and a random bet | Share of bets that cover second place: CALIBRATED (leaders almost always cover). The split between bet types: ASSUMED. |
 | A wager mix, lockout (A > 2B) | \$0 50%; largest safe bet A-2B-1 50% | ASSUMED. |
-| C wager | random | PUBLISHED that C's bets do not depend on the game state (T13 section 2.3, note 5). The flat shape is ASSUMED. |
+| C wager | random | PUBLISHED that C's bets do not depend on the game state (T13 section 2.3, note 5; 1990s-2012). The flat shape is ASSUMED. |
 | "Random" bet | equal weight on 0, 1/4, 1/2, 3/4 and all of the score | ASSUMED. |
 | Missing bet types | weight shared out in proportion among the bet types that exist | ASSUMED. |
-| Opponent FJ accuracy | 50% (champions 60%, not used by default) | PUBLISHED (T13 section 2.3). |
-| Outcome correlation | 0.3, across all players including the user | PUBLISHED value (T13 section 2.3); the binary-scale reading is ASSUMED. |
+| Opponent FJ accuracy | by score rank entering Final Jeopardy: the leader is right more often than second place, and second place more often than third | CALIBRATED. |
+| Outcome correlation | positive, across all players including the user; lower than the 1990s-2012 value in T13 | CALIBRATED. The binary-scale reading is ASSUMED. |
 | Tiebreaker odds | equal, 1/k | ASSUMED. |
 
 T13 is Tesauro et al. (2013). Example: for the scores
@@ -334,14 +361,15 @@ distribution: \$8,000 30.8%, \$1,199 27%, \$2,001 15%, \$3,999 8%, and
 
 Honest limits:
 
-- Five of the six B regimes, all of A's split and C's shape are our
-  assumptions, not fitted values.
+- Five of the six B regimes, A's split between bet types and C's shape are
+  our assumptions, not fitted values.
 - The published B weights come from groups of only a few hundred games each
-  (T13 section 2.3), so even they carry wide error bars.
-- The source data run from roughly the mid-1990s to 2012. Contestant
-  behavior has likely changed since; the model assumes it has not.
-- T13 does not say whether its 0.3 is a binary or a latent correlation. If
-  it is latent, our correlation is too strong.
+  (T13 section 2.3), so even they carry wide error bars. They describe
+  1990s-2012 play; second place's wager mix, the largest behavioral
+  component in Final Jeopardy, has no modern source.
+- The correlation is read as a binary correlation and converted with
+  Sheppard's formula, which is exact only at 50% accuracy. Modern average
+  accuracy is below 50%, so the conversion is approximate.
 - The user's own confidence `p` is self-reported and is not calibrated.
 
 ### 5.4 Worked examples
@@ -364,31 +392,31 @@ that equality was the root of the defect. This case is
 `tests/test_fj_bestresponse.py`.
 
 **Shipped defaults: the reported case.** Leader at \$10,000, opponents at
-\$8,000 and \$3,400, leader 89% confident, all defaults (simulated
-opponents, 50% opponent accuracy, correlation 0.3).
+\$8,000 and \$3,400, leader 89% confident, all 2.1 defaults (simulated
+opponents, accuracy by score rank, calibrated correlation).
 
 | Wager | Win share |
 |---|---|
-| \$0 | 67.1% |
-| \$6,000 (ties B if both double) | 84.6% |
-| **\$6,001 (Tier 1 cover, recommended)** | **91.7%** |
+| \$0 | 69.7% |
+| \$6,000 (ties B if both double) | 84.9% |
+| **\$6,001 (Tier 1 cover, recommended)** | **91.3%** (0.912976) |
 | \$10,000 (all-in) | 89.0% |
 
-Tier 1 says \$6,001. Tier 2 now also says **\$6,001**; the 1.x engine said
-\$6,000. The JavaScript app gives the same \$6,001 and 91.7%. With the
-correlation set to 0, Tier 2 still recommends \$6,001, at 90.2%. The same
+Tier 1 says \$6,001. Tier 2 also says **\$6,001**; the 1.x engine said
+\$6,000. The JavaScript app gives the same \$6,001 and 91.3%. With the
+correlation set to 0, Tier 2 still recommends \$6,001, at 90.4%. The same
 scores at 50% confidence give a different answer: Tier 2 recommends \$100,
-at 72.3% (the \$6,001 cover is worth 59.1%). A small bet clears the \$10,000
+at 74.0% (the \$6,001 cover is worth 58.6%). A small bet clears the \$10,000
 ties that some simulated B wagers produce, for example B betting \$2,000 and
 answering right, without risking much on a coin-flip clue.
 
 **The lock-tie against simulated opponents.** B at \$5,000 against A at
 \$10,000 and C at \$1,000 (section 4.3). Tier 2 also recommends the
-\$5,000 lock-tie wager, but it is worth much less than a guarantee: 18.4%
-at 50% confidence and 41.6% at 89% (betting \$0 gives 5.0%). The reason is
+\$5,000 lock-tie wager, but it is worth much less than a guarantee: 20.8%
+at 50% confidence and 41.9% at 89% (betting \$0 gives 4.9%). The reason is
 that the simulated leader rarely bets nothing here: A is not locked out
-(A = 2B exactly), so 75% of the time A makes the \$1 cover bet. B's all-in
-then wins only when A misses.
+(A = 2B exactly), so A usually makes the \$1 cover bet. B's all-in then wins
+only when A misses.
 
 ## 6. Daily Double wagering: Monte Carlo simulation
 
@@ -411,15 +439,20 @@ Every simplification is named, with its status:
   player with probability 0.6. ASSUMED placeholder. The model does not
   simulate buzzer competition, and a wrong answer does not pass the clue to
   another player.
-- **Future Daily Doubles.** A uniformly random player finds it, wagers half
-  their score (ASSUMED placeholder) and is right 64% of the time (PUBLISHED,
-  average contestants, T13 section 2.2; was a 60% placeholder in 1.x).
+- **Future Daily Doubles.** Each one falls at a uniformly random point among
+  the remaining clues, because modern players find Daily Doubles early.
+  The finder is drawn by score rank, with the leader the most likely
+  finder. The finder wagers a fixed, round-specific fraction of their score
+  and is right at a fixed rate. Finder weights, wager fractions and accuracy
+  are CALIBRATED (ADR-0004). Real finders choose their wager from the game
+  state; this model does not.
 - **Final Jeopardy inside a rollout.** The advised player uses the fast
-  Tier 1 rule (lockout \$0, else lock-tie, else cover, else all-in) at 50%
-  accuracy by default; running the full Tier 2 search in every trial would
-  be too slow. Opponents draw a wager from the simulated behavior in section
-  5.3 and are right 50% of the time. Right/wrong outcomes are drawn from the
-  same copula, correlation 0.3.
+  Tier 1 rule (lockout \$0, else lock-tie, else cover, else all-in) at the
+  CALIBRATED all-player accuracy by default; running the full Tier 2 search
+  in every trial would be too slow. Opponents draw a wager from the
+  simulated behavior in section 5.3, at the CALIBRATED accuracy for their
+  score rank. Right/wrong outcomes are drawn from the same copula and
+  correlation as Tier 2.
 - **Result.** Each rollout returns the advised player's win share (1, 1/k or
   0) under the tiebreaker rule.
 
@@ -472,21 +505,23 @@ Bonferroni value `z* = Phi^{-1}(1 - alpha/k)` with `alpha = 0.05`. A wager
 is on the plateau if `p_best - p_w <= z* × SE_paired(w)`. The recommendation
 is the smallest wager on the plateau.
 
-Current results (Monte Carlo estimates; 2.0 engine):
+Current results (Monte Carlo estimates; 2.1 engine, rerun 2026-10-13):
 
 | Scenario | Trials per wager, seed | Recommended | Best estimate |
 |---|---|---|---|
-| Clear signal: \$3,000 vs \$4,000 vs \$2,000, Double Jeopardy, 100% confident, nothing left before FJ, \$300 steps (11 candidates, z* = 2.609) | 800; seeds 1, 2, 3 | \$3,000 (all-in) on every seed; plateau is \$3,000 alone | 74.8%, 74.8%, 74.3% |
-| Reported case: \$4,200 vs \$6,000 vs \$3,400, Double Jeopardy, four \$1,000 clues and one DD left, \$100 steps (43 candidates, z* = 3.045), 42% confident | 3,000; seed 42 | \$0 (plateau: 7 of 43 wagers, from \$0 to \$4,200) | \$4,200 at 26.5% (\$0: 24.6%) |
-| Same, 44% confident | 3,000; seed 42 | \$100 (plateau: 5 of 43 wagers, from \$100 to \$4,200) | \$4,200 at 27.7% (\$0: 24.6%) |
-| Same, 42% and 44% | 300; seed 42 | \$0 at both | — |
+| Clear signal: \$3,000 vs \$4,000 vs \$2,000, Double Jeopardy, 100% confident, nothing left before FJ, \$300 steps (11 candidates, z* = 2.609) | 800; seeds 1, 2, 3 | \$3,000 (all-in) on every seed; plateau is \$3,000 alone | 70.0%, 70.2%, 68.5% |
+| Reported case: \$4,200 vs \$6,000 vs \$3,400, Double Jeopardy, four \$1,000 clues and one DD left, \$100 steps (43 candidates, z* = 3.045), 42% confident | 3,000; seed 42 | \$0 (plateau: 14 of 43 wagers, between \$0 and \$4,200) | \$4,100 at 25.7% (\$4,200: 25.5%; \$0: 23.5%) |
+| Same, 44% confident | 3,000; seed 42 | \$0 (plateau: 7 of 43 wagers, between \$0 and \$4,200) | \$4,100 at 26.5% (\$4,200: 26.4%; \$0: 23.5%) |
+| Same, 42% and 44% | 300; seed 42 | \$0 at both (plateau: all 43 wagers) | — |
 
 What these numbers do **not** prove: the reported-case runs show only that
-the engine cannot separate \$0 from all-in at 3,000 trials when the
-estimated gap is about 2 to 3 points; they do not show that \$0 is the
+the engine cannot separate \$0 from a near all-in bet at 3,000 trials when
+the estimated gap is about 2 to 3 points; they do not show that \$0 is the
 better bet. Each row is one seed (three for the clear-signal row), so they
-do not measure seed-to-seed stability beyond that. All figures depend on the
-placeholder clue and future-DD rates in section 6.2.
+do not measure seed-to-seed stability beyond that. No row has been checked
+against real games. All figures depend on the placeholder clue rate and the
+CALIBRATED future-DD and Final Jeopardy values in section 6.2; a different
+calibration would move them.
 
 One honesty note: the reported "best estimate" is the in-sample maximum over
 candidate wagers, so it is a mildly *optimistic* (selection-biased)
@@ -503,11 +538,11 @@ of this writing.
 
 ## 7. Validation
 
-**Method.** 43 automated Python tests (`cd tests && python -m pytest -q`,
-43 passed on 2026-10-13): 9 for Tier 1, 9 for Tier 2, 9 for the behavior
-model, 11 for the Daily Double engine, 5 for the rollout simulator. A
-separate harness, `node tests/js_parity.js`, runs 24 checks against the
-JavaScript port in `app/index.html` (24 passed on 2026-10-13). CI runs both on
+**Method.** 46 automated Python tests (`cd tests && python -m pytest -q`,
+46 passed on 2026-10-13): 9 for Tier 1, 9 for Tier 2, 11 for the behavior
+model, 11 for the Daily Double engine, 6 for the rollout simulator. A
+separate harness, `node tests/js_parity.js`, runs 25 checks against the
+JavaScript port in `app/index.html` (25 passed on 2026-10-13). CI runs both on
 every push and pull request.
 
 - **Exact parts (Tier 1, Tier 2, scoring, behavior).** Expected values are
@@ -516,11 +551,15 @@ every push and pull request.
   5.4); a two-way tie worth 1/2 and a three-way tie 1/3; nobody wins at \$0;
   a third-place player at 100% confidence against two leaders with fixed
   wager distributions wins exactly 1/12 (only when both leaders bust); the
-  published B weights reproduced in their regime; and a correlated case with
-  a closed form. In that case (self \$9,000 bets \$1,001, opponent \$5,000
-  always bets all, both 50%, binary correlation 0.3), P(both wrong) = 0.25 +
-  0.3 × 0.25 = 0.325, so the win share is 0.5 + 0.325 = 0.825; the
-  quadrature gives 0.825 within 1.4e-10.
+  published B weights reproduced in their regime; opponent accuracy that
+  follows score rank; the frequency with which each rank finds a future
+  Daily Double; the future-DD wager fraction by round; and a correlated case
+  with a closed form. That case uses explicit inputs, not the model
+  defaults: self \$9,000 bets \$1,001, opponent \$5,000 always bets all, both
+  50%, and an illustrative binary correlation of 0.3 (an input chosen for
+  the hand derivation, not the model's calibrated value). Then P(both
+  wrong) = 0.25 + 0.3 × 0.25 = 0.325, so the win share is 0.5 + 0.325 =
+  0.825; the quadrature gives 0.825 within 1.4e-10.
 - **Shipped-default regression.** For \$10,000 / \$8,000 / \$3,400 and
   \$12,000 / \$9,000 / \$3,000 at 89%, Tier 2 must not recommend the
   tie-only bet 2B-A.
@@ -540,33 +579,54 @@ every push and pull request.
 **What the tests do not prove.** They prove the code computes the model as
 specified. They do not prove the model matches real contestants: no
 recommendation or win share has been checked against the outcomes of real
-games. The published inputs come from aggregate statistics, not from a fit
-by this project, and the assumed inputs have no empirical check at all.
+games. The published and calibrated inputs come from season-level aggregate
+statistics, not from a fit to individual games, and the assumed inputs have
+no empirical check at all. The tests check that the calibrated values are
+wired in correctly; they cannot check them against their source, which is
+not in the repository.
 
 ## 8. Known limitations
 
 In order of how much they matter:
 
-1. **Most of the opponent model is assumed** (section 5.3): five of six B
-   regimes, A's whole split, C's shape, the random grid, and equal
-   tiebreaker odds. Published inputs rest on small samples and pre-2013
-   games. Treat Tier 2 and Daily Double win shares as model outputs, not
-   validated statistics.
-2. **The Daily Double simulator's rest-of-game model is simplified**
-   (section 6.2): no buzzer competition, no pass-through, placeholder clue
-   and future-DD wager rates. Trust it most for the very next decision.
-3. **The correlation's scale is our reading.** If the published 0.3 is a
-   latent correlation, ours (latent 0.454) is too strong.
-4. **The reported Daily Double win share is selection-biased upward**
+1. **Much of the opponent model is assumed** (section 5.3): five of six B
+   regimes, A's split between bet types, C's shape, the random grid, and
+   equal tiebreaker odds. Treat Tier 2 and Daily Double win shares as model
+   outputs, not validated statistics.
+2. **Second place is still pre-2012.** Second place's wager mix, the
+   largest behavioral component in Final Jeopardy, comes from 1990s-2012
+   games (Tesauro et al., 2013), on small samples. No modern source exists.
+3. **Terms-of-use risk, accepted (ADR-0004).** The CALIBRATED values are
+   model settings visible in `engine/behavior.py` and in the app's public
+   source. A strict reading of J! Archive's terms could treat rounded model
+   settings as data derived from J! Archive. We publish no statistics,
+   tables or quotes, and would remove the values on a takedown request.
+4. **Readers cannot reproduce the calibrated values.** The method is
+   described; the source data are not shipped, so a reader cannot check a
+   CALIBRATED value against its source.
+5. **Score rank by proxy.** Who finds a Daily Double is reported by lectern,
+   not by score rank. The returning champion's lectern stands in for the
+   leader.
+6. **The correlation conversion is approximate.** Sheppard's formula reads
+   the correlation as binary and is exact only at 50% accuracy. Modern
+   average accuracy is below 50%.
+7. **The Daily Double simulator's rest-of-game model is simplified**
+   (section 6.2): no buzzer competition, no pass-through, a placeholder
+   clue rate, and future-DD wagers that are a fixed fraction of score rather
+   than a response to the game state. Trust it most for the very next
+   decision.
+8. **The reported Daily Double win share is selection-biased upward**
    (section 6.4, risk #11). The recommended wager is well insulated.
-5. **The JavaScript app is a manually maintained port** with a different
+9. **The JavaScript app is a manually maintained port** with a different
    random number generator; the parity harness covers the exact functions
    only (risk #8).
-6. **1.x figures are not comparable.** Any win percentage from a version
-   before 2.0 scored ties as wins against a different opponent model.
-7. **This tool is a study and post-game analysis aid, not a live-assist
-   device.** Using it during an actual taping would violate the show's
-   rules.
+10. **Earlier figures are not comparable or are superseded.** Any win
+    percentage from a version before 2.0 scored ties as wins against a
+    different opponent model. Every 2.0 Tier 2 and Daily Double figure is
+    superseded by the 2.1 recalibration.
+11. **This tool is a study and post-game analysis aid, not a live-assist
+    device.** Using it during an actual taping would violate the show's
+    rules.
 
 ## 9. References
 
@@ -592,6 +652,10 @@ In order of how much they matter:
   reuse restriction, not used as a data source in this project.
   https://github.com/jwolle1/jeopardy_clue_dataset
 - J! Archive Wagering Calculator. https://j-archive.com/wageringcalculator.php
+- J! Archive. Per-season Daily Double and Final Jeopardy! statistics,
+  Seasons 38-41. Used for private calibration only; the site's terms of use
+  forbid republication, so no figure from it appears in this paper.
+  https://j-archive.com/
 
 ## Reproducing the figures
 
@@ -599,15 +663,23 @@ Every figure in sections 5 and 6 comes from the shipped engine, run from
 `engine/`:
 
 ```
-python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.89); print(r.recommended_wager, r.win_probability)"
-python -c "import fj_bestresponse as br; r = br.analyze([10000, 5000, 1000], 1, 0.5); print(r.recommended_wager, r.win_probability)"
-python -c "import dd_wager; from simulate import RolloutConfig as C; r = dd_wager.analyze([4200, 6000, 3400], 0, 2, 0.42, config=C(remaining_clue_values=[1000]*4, remaining_dd_count=1), trials_per_wager=3000, seed=42); print(r.recommended_wager, r.win_probability, r.plateau)"
+python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.89); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, [d[w] for w in (0, 6000, 6001, 10000)])"
+python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.89, correlation=0.0); print(r.recommended_wager, r.win_probability)"
+python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.5); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, d[6001])"
+python -c "import behavior; print(behavior.wager_distribution([10000, 8000, 3400], 1), behavior.wager_distribution([10000, 8000, 3400], 2))"
+python -c "import fj_bestresponse as br; [print(p, br.analyze([10000, 5000, 1000], 1, p).recommended_wager, dict(br.analyze([10000, 5000, 1000], 1, p).wager_win_probabilities)[5000], dict(br.analyze([10000, 5000, 1000], 1, p).wager_win_probabilities)[0]) for p in (0.5, 0.89)]"
+python -c "import dd_wager; from simulate import RolloutConfig as C; [print(s, (r := dd_wager.analyze([3000, 4000, 2000], 0, 2, 1.0, config=C(), wager_step=300, trials_per_wager=800, seed=s)).recommended_wager, r.win_probability, r.plateau) for s in (1, 2, 3)]"
+python -c "import dd_wager; from simulate import RolloutConfig as C; r = dd_wager.analyze([4200, 6000, 3400], 0, 2, 0.42, config=C(remaining_clue_values=[1000]*4, remaining_dd_count=1), trials_per_wager=3000, seed=42); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, len(r.plateau), d[0], d[4200])"
 ```
+
+Change `0.42` to `0.44`, and `3000` to `300`, for the other Daily Double
+rows.
 
 ## Related project documents
 
 - `docs/adr/0001-data-source-strategy.md` — the data-sourcing decision
 - `docs/adr/0003-simulated-contestant-behavior.md` — the opponent model and tie rule (supersedes ADR-0002)
+- `docs/adr/0004-modern-era-calibration.md` — the private modern-era calibration and its accepted risks (amends ADR-0001 and ADR-0003)
 - `docs/adr/0002-opponent-model-assumptions.md` — the superseded 1.x placeholder model, kept for history
 - `docs/explanation/wagering-theory-research.md` — the original research memo
 - `docs/explanation/tiers-explained.md` — a plain-language companion to the Tier 1/Tier 2 discussion

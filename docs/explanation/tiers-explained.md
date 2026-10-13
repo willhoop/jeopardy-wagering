@@ -50,16 +50,39 @@ confidence and the likely moves of real contestants.
 Smart Bet plays you against **simulated contestants**. The model gives
 each opponent a role by score: leader, second place, or third place.
 Each role has a mix of bet types, for example "cover the doubled score of
-second place" or "bet everything". Some weights come from a published
-study of real games (Tesauro et al., 2013). Others are our assumptions.
-`engine/behavior.py` marks each value as PUBLISHED or ASSUMED.
+second place" or "bet everything".
+
+The simulated contestants play like contestants from recent seasons
+(Seasons 38-41, 2021-2025). Play changed in the 2010s: players now jump
+to high-value clues to hunt Daily Doubles, and they bet them hard. A
+model of older games does not show this. So the model is calibrated to
+the modern era:
+
+- The leader almost always bets to cover second place.
+- Players who are in front answer Final Jeopardy correctly more often
+  than players behind them.
+- Future Daily Doubles can fall at any point in the rest of the round.
+  Leaders find them more often, and finders bet a large part of their
+  score.
+
+Second place's wager mix has no modern source. It still comes from a
+published study of games from 1990s-2012 (Tesauro et al., 2013). Third
+place's bets do not depend on the scores, also from that study.
+`engine/behavior.py` marks each value as CALIBRATED, PUBLISHED or
+ASSUMED.
+
+The calibration used season statistics from J! Archive. Its terms of use
+forbid republishing data from it. So no document in this project gives
+the source statistics or the calibrated values. The values are in
+`engine/behavior.py` only.
 
 Right and wrong answers are correlated across players. A hard clue is
 hard for everyone. So when you miss, a rival is more likely to miss too.
 The model includes you in this correlation.
 
-`docs/adr/0003-simulated-contestant-behavior.md` gives the sources, the
-decision and its negative consequences.
+`docs/adr/0003-simulated-contestant-behavior.md` and
+`docs/adr/0004-modern-era-calibration.md` give the sources, the decisions
+and their negative consequences.
 
 ## Why the Daily Double engine gives a range, not one number
 
@@ -80,14 +103,17 @@ The Safe Bet math is fully determined. It needs no assumption about the
 accuracy of any player.
 
 Smart Bet and the Daily Double engine need a model of opponents. Part of
-that model is published: opponent accuracy, the outcome correlation,
-Daily Double accuracy, and the second-place wager mix in one score
-regime. The other parts are assumptions: the leader's wager mix, the
-second-place mix in the other five regimes, the third-place shape, equal
-tiebreaker odds, and the regular-clue model. The published data are from
-games played between the mid-1990s and 2012. Treat each Smart Bet
-percentage as a model output, not as a validated statistic. See
-`RISK_REGISTER.md` (risks #5, #7 and #14).
+that model is calibrated to modern-era play: Final Jeopardy accuracy by
+score rank, the outcome correlation, the leader's cover share, Daily
+Double accuracy, the Daily Double wager size and who finds a Daily
+Double. Part is published from older games (1990s-2012): the
+second-place wager mix in one score regime. The other parts are
+assumptions: the split of the leader's bets, the second-place mix in the
+other five regimes, the third-place shape, equal tiebreaker odds, and
+the regular-clue model. A reader cannot check the calibrated values
+against their source, because the source data is not published. Treat
+each Smart Bet percentage as a model output, not as a validated
+statistic. See `RISK_REGISTER.md` (risks #5, #7, #14 and #15).
 
 ## Related pages
 
@@ -95,3 +121,4 @@ percentage as a model output, not as a validated statistic. See
 - `docs/tutorial/getting-started.md` — see both tiers in the app.
 - `docs/reference/engine-api.md` — the functions behind these ideas.
 - `docs/adr/0003-simulated-contestant-behavior.md` — the opponent model.
+- `docs/adr/0004-modern-era-calibration.md` — the modern-era calibration.

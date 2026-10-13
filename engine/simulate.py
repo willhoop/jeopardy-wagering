@@ -15,15 +15,15 @@ simplified, and the simplifications are named here rather than hidden:
   are correlated across all players (engine/behavior.py).
 - The result of a rollout is a win share under the tiebreaker rule: 1 for
   an outright win, 1/k for a k-way tie for first, 0 otherwise.
-- Future Daily Doubles (when `remaining_dd_count` > 0) use a crude
-  placeholder: a uniformly random player finds it and wagers a fixed
-  fraction of their own score, at a fixed accuracy rate. This has not been
-  validated and should be refined before trusting multi-DD-ahead results --
-  see RISK_REGISTER.md.
+- Future Daily Doubles (when `remaining_dd_count` > 0) fall at a uniformly
+  random point among the remaining clues. The finder is drawn by score rank
+  and wagers a calibrated, round-specific fraction of their score, at a
+  calibrated accuracy (engine/behavior.py, ADR-0004). Real finders choose
+  their wager from the game state; this model does not.
 
-Defaults marked "published" come from Tesauro et al. (2013) via engine/behavior.py;
-the rest are placeholders, not fitted values. Override any of them
-via RolloutConfig once better numbers exist.
+Defaults marked "calibrated" come from engine/behavior.py (ADR-0004). The
+regular-clue success rate is still a placeholder, not a fitted value.
+Override any of them via RolloutConfig.
 """
 
 import random
@@ -34,9 +34,8 @@ import behavior
 import fj_wager
 
 DEFAULT_REGULAR_CLUE_SUCCESS_RATE = 0.6  # placeholder: P(someone answers a given clue correctly)
-DEFAULT_FJ_CONFIDENCE = behavior.FJ_ACCURACY_AVERAGE  # published, Tesauro et al. (2013)
-DEFAULT_FUTURE_DD_WAGER_FRACTION = 0.5  # placeholder: future-DD finder's bet as a fraction of their score
-DEFAULT_FUTURE_DD_SUCCESS_RATE = behavior.DD_ACCURACY_AVERAGE  # published, Tesauro et al. (2013)
+DEFAULT_FJ_CONFIDENCE = behavior.FJ_ACCURACY_OVERALL  # calibrated, ADR-0004
+DEFAULT_FUTURE_DD_SUCCESS_RATE = behavior.DD_ACCURACY  # calibrated, ADR-0004
 
 
 def simulate_remaining_regular_clues(
@@ -58,15 +57,22 @@ def simulate_remaining_regular_clues(
 def simulate_future_daily_doubles(
     scores: List[int],
     count: int,
-    wager_fraction: float = DEFAULT_FUTURE_DD_WAGER_FRACTION,
+    wager_fraction: Optional[float] = None,
     success_rate: float = DEFAULT_FUTURE_DD_SUCCESS_RATE,
     rng: Optional[random.Random] = None,
+    round_number: int = 2,
 ) -> List[int]:
+    """Play `count` Daily Doubles found by simulated contestants.
+
+    `wager_fraction=None` uses the calibrated fraction for `round_number`.
+    """
     rng = rng or random
     scores = list(scores)
-    n = len(scores)
+    if wager_fraction is None:
+        wager_fraction = behavior.DD_WAGER_FRACTION_BY_ROUND.get(
+            round_number, behavior.DD_WAGER_FRACTION_BY_ROUND[2])
     for _ in range(count):
-        finder = rng.randrange(n)
+        finder = behavior.sample_dd_finder(scores, rng)
         wager = int(max(scores[finder], 0) * wager_fraction)
         if rng.random() < success_rate:
             scores[finder] += wager
@@ -91,7 +97,7 @@ def simulate_final_jeopardy(
     scores: List[int],
     player_index: int,
     fj_confidence: float = DEFAULT_FJ_CONFIDENCE,
-    opponent_accuracy: float = behavior.FJ_ACCURACY_AVERAGE,
+    opponent_accuracy: Optional[float] = None,
     correlation: float = behavior.FJ_OUTCOME_CORRELATION,
     rng: Optional[random.Random] = None,
 ) -> List[int]:
@@ -107,7 +113,7 @@ def simulate_final_jeopardy(
             ps.append(fj_confidence)
         else:
             wagers.append(behavior.sample_wager(behavior.wager_distribution(scores, i), rng))
-            ps.append(opponent_accuracy)
+            ps.append(behavior.fj_accuracy(scores, i) if opponent_accuracy is None else opponent_accuracy)
     r = behavior.latent_correlation(correlation) if correlation > 0 else 0.0
     correct = behavior.sample_correct(ps, r, rng)
     for i, w in enumerate(wagers):
@@ -126,10 +132,11 @@ class RolloutConfig:
     remaining_dd_count: int = 0
     regular_clue_success_rate: float = DEFAULT_REGULAR_CLUE_SUCCESS_RATE
     fj_confidence: float = DEFAULT_FJ_CONFIDENCE
-    opponent_fj_accuracy: float = behavior.FJ_ACCURACY_AVERAGE
+    opponent_fj_accuracy: Optional[float] = None  # None: by score rank
     fj_correlation: float = behavior.FJ_OUTCOME_CORRELATION
-    future_dd_wager_fraction: float = DEFAULT_FUTURE_DD_WAGER_FRACTION
+    future_dd_wager_fraction: Optional[float] = None  # None: calibrated, by round
     future_dd_success_rate: float = DEFAULT_FUTURE_DD_SUCCESS_RATE
+    round_number: int = 2
 
 
 def rollout(
@@ -140,17 +147,23 @@ def rollout(
 ) -> float:
     """Simulate one game continuation from `scores`. Return player_index's win share."""
     rng = rng or random
-    s = simulate_remaining_regular_clues(
-        scores, config.remaining_clue_values, config.regular_clue_success_rate, rng
-    )
-    if config.remaining_dd_count:
+    clues = config.remaining_clue_values
+    # Each future Daily Double falls at a random point among the remaining clues.
+    slots = sorted(rng.randrange(len(clues) + 1) for _ in range(config.remaining_dd_count))
+    s = list(scores)
+    done = 0
+    for slot in slots:
+        s = simulate_remaining_regular_clues(s, clues[done:slot], config.regular_clue_success_rate, rng)
+        done = slot
         s = simulate_future_daily_doubles(
             s,
-            config.remaining_dd_count,
+            1,
             config.future_dd_wager_fraction,
             config.future_dd_success_rate,
             rng,
+            config.round_number,
         )
+    s = simulate_remaining_regular_clues(s, clues[done:], config.regular_clue_success_rate, rng)
     s = simulate_final_jeopardy(
         s,
         player_index,

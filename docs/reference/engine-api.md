@@ -5,7 +5,7 @@ This page describes every public function and data structure in
 `docs/explanation/tiers-explained.md`. For results and figures, read
 `docs/white-paper.md`.
 
-Version: 2.0.0 (2026-10-13).
+Version: 2.1.0 (2026-10-13).
 
 ## Scoring rule (all Tier 2 and Daily Double functions)
 
@@ -28,23 +28,35 @@ This module holds every number that describes contestant behavior and the
 scoring rule. All values are in one configuration block at the top of the
 file. `app/index.html` mirrors the block in its `BEHAVIOR` object. The
 sources and the reasons are in
-`docs/adr/0003-simulated-contestant-behavior.md`.
+`docs/adr/0003-simulated-contestant-behavior.md` and
+`docs/adr/0004-modern-era-calibration.md`.
 
 ### Configuration constants
 
-| Name | Value | Status | Meaning |
-|---|---|---|---|
-| `TIEBREAKER_RULE` | `True` | Rule since 2014-11-24 | `True`: a k-way tie scores 1/k. `False`: a tie scores 1. |
-| `FJ_ACCURACY_AVERAGE` | `0.50` | PUBLISHED | Final Jeopardy accuracy of an average contestant. |
-| `FJ_ACCURACY_CHAMPION` | `0.60` | PUBLISHED | Final Jeopardy accuracy of a champion. No engine default uses it. |
-| `FJ_OUTCOME_CORRELATION` | `0.30` | PUBLISHED | Correlation of right/wrong outcomes across players. Read as a binary correlation (ADR-0003). |
-| `DD_ACCURACY_AVERAGE` | `0.64` | PUBLISHED | Daily Double accuracy of an average contestant. |
-| `B_WEIGHTS` | dict | PUBLISHED for one regime, ASSUMED for five | Second-place wager mix: `bankroll`, `keepout_c`, `overtake_a`, `two_thirds`, `random`. |
-| `A_WEIGHTS` | dict | ASSUMED | Leader wager mix when not locked out: `cover`, `cover_tie`, `bankroll`, `random`. |
-| `A_LOCKOUT_WEIGHTS` | dict | ASSUMED | Leader wager mix in a lockout: `zero`, `max_safe`. |
-| `RANDOM_GRID_QUARTERS` | `(0, 1, 2, 3, 4)` | ASSUMED | The "random" bet: an equal spread over 0, 1/4, 1/2, 3/4 and all of the score. |
-| `QUAD_HALF_WIDTH` | `6.0` | Numerical | Integration range [-6, 6] for the shared clue-difficulty factor. |
-| `QUAD_STEP` | `0.25` | Numerical | Integration step for the shared factor. |
+Each value has one of three labels:
+
+- **CALIBRATED**: fitted privately to modern-era play (Seasons 38-41,
+  2021-2025, ADR-0004). The source data must not be republished, so this
+  page does not give these values. See `engine/behavior.py` for the value.
+- **PUBLISHED**: from Tesauro et al. (2013), which describes games from
+  1990s-2012.
+- **ASSUMED**: our choice.
+
+| Name | Status | Meaning |
+|---|---|---|
+| `TIEBREAKER_RULE` | Rule since 2014-11-24 | `True` (current value): a k-way tie scores 1/k. `False`: a tie scores 1. |
+| `FJ_ACCURACY_BY_RANK` | CALIBRATED | Tuple of three Final Jeopardy accuracies, by score rank on entry to Final Jeopardy: leader, second, third. See `engine/behavior.py` for the value. |
+| `FJ_ACCURACY_OVERALL` | CALIBRATED | Final Jeopardy accuracy over all players. Default for the analyzed player inside Daily Double rollouts, and for `OpponentModel.p_correct`. See `engine/behavior.py` for the value. |
+| `FJ_OUTCOME_CORRELATION` | CALIBRATED | Pairwise correlation of right/wrong outcomes across players, read as a binary correlation. `latent_correlation()` converts it. See `engine/behavior.py` for the value. |
+| `DD_ACCURACY` | CALIBRATED | Daily Double accuracy. Default for future Daily Doubles in a rollout. See `engine/behavior.py` for the value. |
+| `DD_WAGER_FRACTION_BY_ROUND` | CALIBRATED | Dict `{round: fraction}`. The fraction of the finder's score that a future Daily Double wager takes, for round 1 and round 2. See `engine/behavior.py` for the value. |
+| `DD_FINDER_WEIGHTS_BY_RANK` | CALIBRATED | Tuple of three weights: the relative chance that the leader, second or third finds a future Daily Double. See `engine/behavior.py` for the value. |
+| `B_WEIGHTS` | PUBLISHED for one regime (1990s-2012), ASSUMED for five | Second-place wager mix: `bankroll`, `keepout_c`, `overtake_a`, `two_thirds`, `random`. No modern calibration exists. |
+| `A_WEIGHTS` | Cover share CALIBRATED; split ASSUMED | Leader wager mix when not locked out: `cover`, `cover_tie`, `bankroll`, `random`. See `engine/behavior.py` for the value. |
+| `A_LOCKOUT_WEIGHTS` | ASSUMED | Leader wager mix in a lockout: `zero` and `max_safe`, equal weights. |
+| `RANDOM_GRID_QUARTERS` | ASSUMED | `(0, 1, 2, 3, 4)`. The "random" bet: an equal spread over 0, 1/4, 1/2, 3/4 and all of the score. |
+| `QUAD_HALF_WIDTH` | Numerical | `6.0`. Integration range [-6, 6] for the shared clue-difficulty factor. |
+| `QUAD_STEP` | Numerical | `0.25`. Integration step for the shared factor. |
 
 `WagerDist` is a type alias: a list of `(wager, probability)` pairs.
 
@@ -69,11 +81,29 @@ If a bet type does not exist in a state, the function shares its weight
 among the other bet types, in proportion. Each wager is clamped to
 [0, score]. The probabilities sum to 1.
 
+### `score_rank(scores, player_index) -> int`
+
+Returns the score rank of one player: 0 for the leader, 1 for second,
+2 for third. Equal scores go to the lower index first.
+
+### `fj_accuracy(scores, player_index) -> float`
+
+Returns the Final Jeopardy accuracy of a simulated contestant:
+`FJ_ACCURACY_BY_RANK[score_rank(scores, player_index)]`. A rank above 2
+uses the last entry.
+
+### `sample_dd_finder(scores, rng) -> int`
+
+Draws the index of the player who finds a future Daily Double. The draw
+uses `DD_FINDER_WEIGHTS_BY_RANK`, applied by score rank. `rng` is a
+`random.Random`.
+
 ### `latent_correlation(binary_correlation) -> float`
 
 Returns `sin(binary_correlation * pi / 2)`. This is the latent normal
-correlation that gives the stated binary correlation at 50% accuracy
-(Sheppard's formula).
+correlation that gives the stated binary correlation when every accuracy
+is p = 0.5 (Sheppard's formula). At other accuracies, the conversion is
+approximate (ADR-0004).
 
 ### `normal_cdf(x) -> float` and `inverse_normal_cdf(p) -> float`
 
@@ -153,8 +183,7 @@ branch. It does not sample.
 
 | Name | Value |
 |---|---|
-| `DEFAULT_OPPONENT_CORRECTNESS` | `behavior.FJ_ACCURACY_AVERAGE` (0.5) |
-| `DEFAULT_CORRELATION` | `behavior.FJ_OUTCOME_CORRELATION` (0.3) |
+| `DEFAULT_CORRELATION` | `behavior.FJ_OUTCOME_CORRELATION` (CALIBRATED) |
 
 ### `OpponentModel`
 
@@ -164,7 +193,7 @@ A data structure for one opponent.
 |---|---|---|
 | `score` | int | The current score of the opponent. |
 | `wager_dist` | `WagerDist` | Each possible wager, with its probability. The probabilities must sum to 1.0. |
-| `p_correct` | float | The probability that the opponent answers correctly. Default: `DEFAULT_OPPONENT_CORRECTNESS`. |
+| `p_correct` | float | The probability that the opponent answers correctly. Default: `behavior.FJ_ACCURACY_OVERALL`. `analyze()` sets it for each opponent. |
 
 ### `default_opponent_wager_model(scores, opponent_index) -> WagerDist`
 
@@ -182,9 +211,9 @@ Returns the exact expected win share for one wager, against a list of
 | `self_wager` | int | The wager to evaluate. |
 | `p_self_correct` | float | The confidence of the analyzed player, from 0.0 to 1.0. |
 | `opponents` | list of `OpponentModel` | The opponents. |
-| `correlation` | float | Binary correlation of right/wrong outcomes across all players, including the analyzed player. Default: **0.0** (independent outcomes). The default is 0 so that hand-derived tests can use independent outcomes. `analyze()` uses 0.3. |
+| `correlation` | float | Binary correlation of right/wrong outcomes across all players, including the analyzed player. Default: **0.0** (independent outcomes). The default is 0 so that hand-derived tests can use independent outcomes. `analyze()` uses `DEFAULT_CORRELATION`. |
 
-### `analyze(scores, player_index, p_self_correct, opponent_model_fn=default_opponent_wager_model, opponent_correctness=0.5, correlation=0.3, wager_step=100) -> FJBestResponse`
+### `analyze(scores, player_index, p_self_correct, opponent_model_fn=default_opponent_wager_model, opponent_correctness=None, correlation=DEFAULT_CORRELATION, wager_step=100) -> FJBestResponse`
 
 Tests candidate wagers. Returns the wager with the highest expected win
 share.
@@ -197,8 +226,8 @@ share.
 | `player_index` | int | The position of the player to analyze. Raises `ValueError` if out of range. |
 | `p_self_correct` | float | The confidence of the analyzed player, from 0.0 to 1.0. |
 | `opponent_model_fn` | function | Makes the wager distribution of each opponent. Default: `default_opponent_wager_model`. |
-| `opponent_correctness` | float | The accuracy of each opponent. Default: `DEFAULT_OPPONENT_CORRECTNESS` (0.5). |
-| `correlation` | float | Binary correlation of right/wrong outcomes across all players. Default: `DEFAULT_CORRELATION` (0.3). |
+| `opponent_correctness` | float or None | `None` (default): each opponent gets the accuracy for their score rank, `behavior.fj_accuracy(scores, i)`. A float: every opponent gets that accuracy. |
+| `correlation` | float | Binary correlation of right/wrong outcomes across all players. Default: `DEFAULT_CORRELATION`. |
 | `wager_step` | int | The gap, in dollars, between candidate wagers. Default: 100. |
 
 The candidate wagers are every multiple of `wager_step` from $0 to the
@@ -222,10 +251,9 @@ wager minus $1, and the Tier 1 lock-tie wager, when these exist.
 
 | Name | Value | Status |
 |---|---|---|
-| `DEFAULT_REGULAR_CLUE_SUCCESS_RATE` | 0.6 | ASSUMED |
-| `DEFAULT_FJ_CONFIDENCE` | `behavior.FJ_ACCURACY_AVERAGE` (0.5) | PUBLISHED |
-| `DEFAULT_FUTURE_DD_WAGER_FRACTION` | 0.5 | ASSUMED |
-| `DEFAULT_FUTURE_DD_SUCCESS_RATE` | `behavior.DD_ACCURACY_AVERAGE` (0.64) | PUBLISHED |
+| `DEFAULT_REGULAR_CLUE_SUCCESS_RATE` | 0.6 | ASSUMED (placeholder) |
+| `DEFAULT_FJ_CONFIDENCE` | `behavior.FJ_ACCURACY_OVERALL` | CALIBRATED |
+| `DEFAULT_FUTURE_DD_SUCCESS_RATE` | `behavior.DD_ACCURACY` | CALIBRATED |
 
 ### `RolloutConfig`
 
@@ -236,22 +264,26 @@ The assumptions for one simulated rest of the game, after a Daily Double.
 | `remaining_clue_values` | list of int | `[]` | The dollar value of each regular clue still on the board. |
 | `remaining_dd_count` | int | 0 | The number of Daily Doubles still hidden. |
 | `regular_clue_success_rate` | float | 0.6 | The chance that a player answers a given regular clue correctly. |
-| `fj_confidence` | float | 0.5 | The Final Jeopardy accuracy of the analyzed player inside the rollout. |
-| `opponent_fj_accuracy` | float | 0.5 | The Final Jeopardy accuracy of each opponent. |
-| `fj_correlation` | float | 0.3 | Binary correlation of Final Jeopardy outcomes across all players. |
-| `future_dd_wager_fraction` | float | 0.5 | The fraction of score that a player wagers on a future Daily Double. |
-| `future_dd_success_rate` | float | 0.64 | The chance that a player answers a future Daily Double correctly. |
+| `fj_confidence` | float | `DEFAULT_FJ_CONFIDENCE` | The Final Jeopardy accuracy of the analyzed player inside the rollout. |
+| `opponent_fj_accuracy` | float or None | `None` | `None`: each opponent gets the accuracy for their score rank (`behavior.fj_accuracy`). A float: every opponent gets that accuracy. |
+| `fj_correlation` | float | `behavior.FJ_OUTCOME_CORRELATION` | Binary correlation of Final Jeopardy outcomes across all players. |
+| `future_dd_wager_fraction` | float or None | `None` | `None`: the calibrated fraction for `round_number` (`behavior.DD_WAGER_FRACTION_BY_ROUND`). A float: that fraction of the finder's score. |
+| `future_dd_success_rate` | float | `DEFAULT_FUTURE_DD_SUCCESS_RATE` | The chance that the finder answers a future Daily Double correctly. |
+| `round_number` | int | 2 | The round of the future Daily Doubles. `dd_wager.analyze()` sets it to the round of the current Daily Double. |
 
 ### `simulate_remaining_regular_clues(scores, clue_values, success_rate=0.6, rng=None) -> List[int]`
 
 For each clue value, a uniformly random player gains the value with
 probability `success_rate`. Returns the new scores.
 
-### `simulate_future_daily_doubles(scores, count, wager_fraction=0.5, success_rate=0.64, rng=None) -> List[int]`
+### `simulate_future_daily_doubles(scores, count, wager_fraction=None, success_rate=DEFAULT_FUTURE_DD_SUCCESS_RATE, rng=None, round_number=2) -> List[int]`
 
-For each future Daily Double, a uniformly random player wagers
-`wager_fraction` of their score and wins or loses it. Returns the new
-scores.
+Plays `count` future Daily Doubles. For each one,
+`behavior.sample_dd_finder` picks the finder by score rank. The finder
+wagers `wager_fraction` of their score (not less than $0) and wins or
+loses it. `wager_fraction=None` uses
+`behavior.DD_WAGER_FRACTION_BY_ROUND[round_number]`; an unknown round
+uses the round 2 value. Returns the new scores.
 
 ### `tier1_wager(scores, i) -> int`
 
@@ -259,12 +291,14 @@ Returns the Final Jeopardy wager of the analyzed player inside a rollout:
 $0 in a lockout, else the Tier 1 lock-tie wager, else the Tier 1 cover
 wager, else the legal maximum.
 
-### `simulate_final_jeopardy(scores, player_index, fj_confidence=0.5, opponent_accuracy=0.5, correlation=0.3, rng=None) -> List[int]`
+### `simulate_final_jeopardy(scores, player_index, fj_confidence=DEFAULT_FJ_CONFIDENCE, opponent_accuracy=None, correlation=behavior.FJ_OUTCOME_CORRELATION, rng=None) -> List[int]`
 
 Resolves Final Jeopardy once. The analyzed player (`player_index`) uses
 `tier1_wager`. Each opponent draws a wager from
-`behavior.wager_distribution`. Right/wrong outcomes are correlated across
-all players. Returns the final scores.
+`behavior.wager_distribution`. `opponent_accuracy=None` gives each
+opponent the accuracy for their score rank (`behavior.fj_accuracy`); a
+float gives every opponent that accuracy. Right/wrong outcomes are
+correlated across all players. Returns the final scores.
 
 ### `wins(scores, player_index) -> float`
 
@@ -272,9 +306,10 @@ Returns `behavior.win_share(scores, player_index)`: 1, 1/k, or 0.
 
 ### `rollout(scores, player_index, config, rng=None) -> float`
 
-Simulates the rest of the game once: regular clues, then future Daily
-Doubles, then Final Jeopardy. Returns the win share of `player_index`
-(1, 1/k, or 0).
+Simulates the rest of the game once. Each future Daily Double falls at a
+uniformly random point among the remaining regular clues. The regular
+clues and the future Daily Doubles play in that order, then Final
+Jeopardy. Returns the win share of `player_index` (1, 1/k, or 0).
 
 ## `engine/dd_wager.py` — Daily Double engine
 
@@ -298,7 +333,7 @@ separate from the best one.
 | `player_index` | int | The position of the player to analyze. Raises `ValueError` if out of range. |
 | `round_number` | int | `1` for Single Jeopardy, `2` for Double Jeopardy. |
 | `p_correct` | float | The confidence of the analyzed player in this Daily Double clue. |
-| `config` | `RolloutConfig` or None | The rest of the game. `None` gives `RolloutConfig()`. |
+| `config` | `RolloutConfig` or None | The rest of the game. `None` gives `RolloutConfig()`. The engine uses a copy of `config` with `round_number` set to this round, so future Daily Doubles use the wager fraction of this round. The caller's object does not change. |
 | `wager_step` | int | The gap, in dollars, between candidate wagers. Default: 100. |
 | `trials_per_wager` | int | Simulated trials per candidate wager. Default: 3000. |
 | `z_score` | float or None | A fixed band width for the plateau. `None` (default) uses a Bonferroni band, `z* = Phi^-1(1 - alpha/k)`, for `k` candidate wagers. |

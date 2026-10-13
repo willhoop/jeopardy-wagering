@@ -72,7 +72,7 @@ docs/reviews/statistical-review-2026-07-23-v2.md and RISK_REGISTER.md):
 import math
 import random
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import List, Optional, Tuple
 
 from simulate import RolloutConfig, rollout
@@ -175,6 +175,8 @@ def analyze(
         raise ValueError("player_index out of range")
     if config is None:
         config = RolloutConfig()
+    # Future Daily Doubles in a rollout belong to the same round as this one.
+    config = replace(config, round_number=round_number)
 
     player_score = scores[player_index]
     max_wager = legal_max_dd_wager(player_score, round_number)

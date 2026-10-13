@@ -47,6 +47,9 @@ active voice, one meaning per word).
 - [`adr/0003-simulated-contestant-behavior.md`](adr/0003-simulated-contestant-behavior.md)
   — the tiebreaker rule and the simulated opponents of Tier 2 and the
   Daily Double engine.
+- [`adr/0004-modern-era-calibration.md`](adr/0004-modern-era-calibration.md)
+  — the private calibration of the simulated opponents to modern-era play
+  (Seasons 38-41), and the accepted J! Archive terms-of-use risk.
 - [`reviews/statistical-review-2026-07-23.md`](reviews/statistical-review-2026-07-23.md)
   — first statistical review (Daily Double wager selection, and the
   strict-win tiebreak that 2.0.0 removed).

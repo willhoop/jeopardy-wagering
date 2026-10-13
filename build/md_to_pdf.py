@@ -89,8 +89,12 @@ def via_browser(html, out):
     last = ""
     for attempt in range(3):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        if os.path.exists(out) and os.path.getsize(out) > 0:
-            return os.path.basename(exe)
+        # Edge can hand off to a broker process and exit before the file
+        # lands, so wait for it before calling this attempt a failure.
+        for _ in range(40):
+            if os.path.exists(out) and os.path.getsize(out) > 0:
+                return os.path.basename(exe)
+            time.sleep(0.5)
         last = r.stderr[-500:]
         time.sleep(1.5)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -104,6 +108,8 @@ def main():
     src, out = sys.argv[1], sys.argv[2]
     with open(src, encoding="utf-8") as f:
         md = f.read()
+    # Docs escape dollar signs (\$) so GitHub does not render them as math.
+    md = md.replace("\\$", "$")
     m = re.search(r"^#\s+(.+)$", md, re.M)
     title = m.group(1).strip() if m else os.path.basename(src)
     html = to_html(md, title)

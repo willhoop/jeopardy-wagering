@@ -3,3 +3,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.egg-info/
+
+# Private calibration notes from J! Archive season pages. Never commit (ADR-0004).
+data/private/
+.~lock.*#

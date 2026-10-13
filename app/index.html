@@ -464,7 +464,7 @@
         <li><strong>Safe Bet (Tier 1):</strong> "What wager can't hurt me if I'm right?" This assumes your opponents play the worst possible way against you — betting everything and getting it right — and finds the wager that beats that no matter what. It needs no guess about your confidence at all.</li>
         <li><strong>Smart Bet (Tier 2 / Daily Double engine):</strong> "Given how sure I actually am, and how real contestants tend to bet and answer, what wager gives me the best real odds of winning?" This one uses your confidence slider and can recommend a smaller, less paranoid wager than the Safe Bet when it's justified.</li>
       </ul>
-      <p><strong>Simulated opponents.</strong> Smart Bet plays your rivals as simulated contestants, built from IBM's published study of about 3,000 real games (Tesauro et al., 2013). The leader usually bets to cover second place's doubled score. Second place mixes going all-in, keeping third place out, overtaking the leader and the small "two-thirds" bet, in the proportions that study published. Third place bets with no pattern. Rivals answer Final Jeopardy right half the time, and a hard clue tends to be hard for everyone. Some of these numbers come straight from the study; the rest are our assumptions, labeled as such in <code>docs/adr/0003-simulated-contestant-behavior.md</code>. Treat the exact win percentages as a guide, not gospel.</p>
+      <p><strong>Simulated opponents, modern era.</strong> Smart Bet plays your rivals as simulated contestants who bet and answer the way players have in recent seasons (2021&ndash;2025). Strategy changed a lot in the 2010s: players now hunt Daily Doubles early and bet them hard. The leader almost always bets to cover second place's doubled score. Players who lead going into Final Jeopardy are right more often than players behind them, and a hard clue tends to be hard for everyone. Second place's betting mix still comes from IBM's study of older games (Tesauro et al., 2013), because no modern figure for it exists. The modern values were fitted privately to J! Archive season statistics. J! Archive's terms forbid republishing its data, so the statistics themselves are not shown here or in the project's documents. Details: <code>docs/adr/0004-modern-era-calibration.md</code>. Treat the exact win percentages as a guide, not gospel.</p>
       <p><strong>Ties.</strong> Since November 2014, a tie for first place goes to a tiebreaker clue. Only one player comes back. So a tie counts as half a win here (a third, for a three-way tie), and nobody wins at $0. Betting to tie is almost never free: the extra dollar usually turns the tie into a win.</p>
       <p>The underlying math lives in Python at <code>engine/fj_wager.py</code>, <code>engine/fj_bestresponse.py</code>, <code>engine/simulate.py</code>, and <code>engine/dd_wager.py</code>, with tests in <code>tests/</code>. This page is a hand-written JavaScript port of that same logic so it can run in a browser. A parity script in <code>tests/js_parity.js</code> checks it against hand-derived values on every push.</p>
     </div>
@@ -473,7 +473,7 @@
 </main>
 
 <footer>
-  Jeopardy! Wager Trainer v2.0.0 — practice tool, not affiliated with the show.<br>
+  Jeopardy! Wager Trainer v2.1.0 — practice tool, not affiliated with the show.<br>
   Built by <a href="https://willhoop.github.io/" target="_blank" rel="noopener">willhoop.github.io</a>
 </footer>
 
@@ -523,14 +523,19 @@ function fjTier1(scores, playerIndex) {
 
 /* ---------- Simulated contestant behavior (mirrors engine/behavior.py) ----------
    One configuration block. PUBLISHED = Tesauro et al. (2013), JAIR 47:205-251.
+   CALIBRATED = private modern-era calibration, source not republished (ADR-0004).
    Tie rule: since 24 Nov 2014 a tie for first goes to a tiebreaker clue. */
 const BEHAVIOR = {
   tiebreakerRule: true,
-  fjAccuracyAverage: 0.50,      // PUBLISHED
-  fjOutcomeCorrelation: 0.30,   // PUBLISHED (binary, at 50% accuracy)
-  ddAccuracyAverage: 0.64,      // PUBLISHED
-  bWeights: { bankroll: 0.26, keepout_c: 0.27, overtake_a: 0.15, two_thirds: 0.08, random: 0.24 }, // PUBLISHED for B>=3/4A, B>=2C
-  aWeights: { cover: 0.75, cover_tie: 0.10, bankroll: 0.05, random: 0.10 }, // ASSUMED
+  // CALIBRATED = fitted privately to modern-era play, Seasons 38-41 (ADR-0004).
+  fjAccuracyByRank: [0.51, 0.46, 0.40], // CALIBRATED (leader, second, third)
+  fjAccuracyOverall: 0.45,      // CALIBRATED
+  fjOutcomeCorrelation: 0.16,   // CALIBRATED (binary)
+  ddAccuracy: 0.65,             // CALIBRATED
+  ddWagerFractionByRound: { 1: 0.87, 2: 0.46 }, // CALIBRATED
+  ddFinderWeightsByRank: [0.41, 0.30, 0.29],    // CALIBRATED
+  bWeights: { bankroll: 0.26, keepout_c: 0.27, overtake_a: 0.15, two_thirds: 0.08, random: 0.24 }, // PUBLISHED for B>=3/4A, B>=2C (1990s-2012)
+  aWeights: { cover: 0.80, cover_tie: 0.04, bankroll: 0.04, random: 0.12 }, // cover share CALIBRATED, split ASSUMED
   aLockoutWeights: { zero: 0.5, max_safe: 0.5 }, // ASSUMED
   randomGridQuarters: [0, 1, 2, 3, 4],
   quadHalfWidth: 6.0,
@@ -609,7 +614,7 @@ function wagerDistribution(scores, idx) {
 function wagerDistributionUncached(scores, idx) {
   const me = scores[idx];
   if (me <= 0) return [[0, 1]];
-  const order = scores.map((_, i) => i).sort((x, y) => (scores[y] - scores[x]) || (x - y));
+  const order = scoreOrder(scores);
   const rank = order.indexOf(idx);
   const ranked = order.map(i => scores[i]).concat([0, 0]);
   const a = ranked[0], b = ranked[1], c = ranked[2];
@@ -631,6 +636,21 @@ function wagerDistributionUncached(scores, idx) {
     return behaviorMix(me, BEHAVIOR.bWeights, { bankroll: me, keepout_c: keepout, overtake_a: overtake, two_thirds: twoThirds });
   }
   return behaviorMix(me, { random: 1 }, {});
+}
+
+function scoreOrder(scores) {
+  return scores.map((_, i) => i).sort((x, y) => (scores[y] - scores[x]) || (x - y));
+}
+function fjAccuracy(scores, idx) {
+  const a = BEHAVIOR.fjAccuracyByRank;
+  return a[Math.min(scoreOrder(scores).indexOf(idx), a.length - 1)];
+}
+function sampleDDFinder(scores, rng) {
+  const order = scoreOrder(scores), w = BEHAVIOR.ddFinderWeightsByRank;
+  const weights = order.map((_, k) => w[Math.min(k, w.length - 1)]);
+  let u = rng() * weights.reduce((a, b) => a + b, 0), acc = 0;
+  for (let k = 0; k < weights.length; k++) { acc += weights[k]; if (u < acc) return order[k]; }
+  return order[order.length - 1];
 }
 
 function quadratureNodes() {
@@ -734,13 +754,14 @@ function expectedWinProbability(selfScore, selfWager, pSelf, opponents, correlat
   return expectedShare(selfScore, selfWager, opponentTable(opponents, pSelf, correlation));
 }
 
-function fjTier2(scores, playerIndex, pSelf, oppCorrect = BEHAVIOR.fjAccuracyAverage, correlation = BEHAVIOR.fjOutcomeCorrelation) {
+// oppCorrect = null gives each opponent the calibrated accuracy for their score rank.
+function fjTier2(scores, playerIndex, pSelf, oppCorrect = null, correlation = BEHAVIOR.fjOutcomeCorrelation) {
   const selfScore = scores[playerIndex];
   const maxWager = legalMaxWager(selfScore);
   const opponents = scores
     .map((s, i) => i)
     .filter(i => i !== playerIndex)
-    .map(i => ({ score: scores[i], dist: defaultOpponentDist(scores, i), pCorrect: oppCorrect }));
+    .map(i => ({ score: scores[i], dist: defaultOpponentDist(scores, i), pCorrect: oppCorrect == null ? fjAccuracy(scores, i) : oppCorrect }));
 
   const tier1 = fjTier1(scores, playerIndex);
   const candidateSet = new Set();
@@ -777,17 +798,25 @@ function mulberry32(seed) {
 function simulateRestOfGame(scores, playerIndex, remainingClueValues, remainingDDCount, fjConfidence, regularSuccessRate, futureDDFraction, futureDDSuccessRate, rng) {
   let s = scores.slice();
   const n = s.length;
-  for (const v of remainingClueValues) {
-    if (rng() < regularSuccessRate) {
-      const winner = Math.floor(rng() * n);
-      s[winner] += v;
+  const playClues = (from, to) => {
+    for (let c = from; c < to; c++) {
+      if (rng() < regularSuccessRate) s[Math.floor(rng() * n)] += remainingClueValues[c];
     }
-  }
-  for (let k = 0; k < remainingDDCount; k++) {
-    const finder = Math.floor(rng() * n);
+  };
+  // Each future Daily Double falls at a random point among the remaining
+  // clues; the finder is drawn by score rank (calibrated, ADR-0004).
+  const slots = [];
+  for (let k = 0; k < remainingDDCount; k++) slots.push(Math.floor(rng() * (remainingClueValues.length + 1)));
+  slots.sort((a, b) => a - b);
+  let done = 0;
+  for (const slot of slots) {
+    playClues(done, slot);
+    done = slot;
+    const finder = sampleDDFinder(s, rng);
     const wager = Math.floor(Math.max(s[finder], 0) * futureDDFraction);
     if (rng() < futureDDSuccessRate) s[finder] += wager; else s[finder] -= wager;
   }
+  playClues(done, remainingClueValues.length);
   // Final Jeopardy: the advised player uses the Tier 1 rule; opponents draw
   // a simulated human wager; right/wrong outcomes are correlated.
   const wagers = s.map((_, i) => {
@@ -798,7 +827,7 @@ function simulateRestOfGame(scores, playerIndex, remainingClueValues, remainingD
     if (r.minWager != null) return r.minWager;
     return r.maxWager;
   });
-  const ps = s.map((_, i) => i === playerIndex ? fjConfidence : BEHAVIOR.fjAccuracyAverage);
+  const ps = s.map((_, i) => i === playerIndex ? fjConfidence : fjAccuracy(s, i));
   const correct = sampleCorrect(ps, latentCorrelation(BEHAVIOR.fjOutcomeCorrelation), rng);
   for (let i = 0; i < n; i++) s[i] += correct[i] ? wagers[i] : -wagers[i];
   return winShare(s, playerIndex);
@@ -863,7 +892,9 @@ function bonferroniZ(numCandidates, alpha) {
 // multiplicity-adjusted Bonferroni value z* = Phi^{-1}(1 - alpha/k). See
 // RISK_REGISTER.md risk #9 and #10, and the v2 statistical review.
 function ddAnalyze(scores, playerIndex, round, pCorrect, remainingClueValues, remainingDDCount, trials = 3000, zScore = null, alpha = 0.05) {
-  const fjConfidence = BEHAVIOR.fjAccuracyAverage, regularSuccessRate = 0.6, futureDDFraction = 0.5, futureDDSuccessRate = BEHAVIOR.ddAccuracyAverage;
+  const fjConfidence = BEHAVIOR.fjAccuracyOverall, regularSuccessRate = 0.6;
+  const futureDDFraction = BEHAVIOR.ddWagerFractionByRound[round] ?? BEHAVIOR.ddWagerFractionByRound[2];
+  const futureDDSuccessRate = BEHAVIOR.ddAccuracy;
   const maxWager = legalMaxDDWager(scores[playerIndex], round);
   const step = Math.max(1, Math.round(maxWager / 24) || 1);
   const candidateSet = new Set();
@@ -1117,7 +1148,7 @@ function runDDAnalysis() {
     `At ${Math.round(confidence * 100)}% confidence, this wager gives an estimated ${Math.round(rec.winProbability * 100)}% simulated win rate from here.`,
     `Legal max wager here is ${money(legalMaxDDWager(self, round))} (the bigger of your score or the round cap).`,
     `Win probabilities are Monte Carlo estimates (${rec.trials} simulated trials per candidate wager) — small differences between nearby wagers can be simulation noise, not a real edge; that's what the shaded plateau band is showing.`,
-    `Rivals play as simulated contestants, and a tie for first counts as half a win (tiebreaker rule). The rest of the board is a simplified model (see the "How This Works" tab) — treat it as a guide, not gospel.`
+    `Rivals play as simulated modern-era contestants (they find and bet Daily Doubles aggressively), and a tie for first counts as half a win (tiebreaker rule). The rest of the board is a simplified model (see the "How This Works" tab) — treat it as a guide, not gospel.`
   ];
   document.getElementById('dd-notes').innerHTML = notes.map(n => `<li>${n}</li>`).join('');
 
@@ -1160,7 +1191,7 @@ function runFJAnalysis() {
   const notes = [
     "A tie for first goes to a tiebreaker clue (rule since November 2014), so a tie counts as half a win here.",
     "Safe Bet ignores your confidence entirely; Smart Bet uses it, which is why Smart Bet can recommend less.",
-    "Rivals are simulated contestants based on a published study of real games; some weights are our assumptions (see How This Works)."
+    "Rivals are simulated contestants calibrated to how players have bet and answered in recent seasons (see How This Works)."
   ];
   document.getElementById('fj-notes').innerHTML = notes.map(n => `<li>${n}</li>`).join('');
 
