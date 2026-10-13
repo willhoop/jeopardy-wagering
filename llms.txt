@@ -1,0 +1,14 @@
+# Jeopardy Wagering
+
+> A trainer for Jeopardy!'s two betting decisions, the Daily Double and Final Jeopardy. It shows the safe bet and the best bet, then quizzes you on both.
+
+Keywords: Jeopardy!, Final Jeopardy, Daily Double, wagering strategy, game theory, Monte Carlo simulation, quiz
+
+## Links
+
+- [App](https://willhoop.github.io/jeopardy-wagering/app/)
+- [White paper (PDF)](https://github.com/willhoop/jeopardy-wagering/blob/main/build/white-paper.pdf)
+- [Slide deck (PDF)](https://github.com/willhoop/jeopardy-wagering/blob/main/build/deck.pdf)
+- [Technical docs](https://github.com/willhoop/jeopardy-wagering/blob/main/docs/README.md)
+- [Source](https://github.com/willhoop/jeopardy-wagering)
+- [Portfolio](https://willhoop.github.io/)

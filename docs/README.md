@@ -15,7 +15,7 @@ active voice, one meaning per word).
 ## Tutorial — learning-oriented
 
 - [`tutorial/getting-started.md`](tutorial/getting-started.md) — a first
-  session with known, reproducible expected numbers you can check against.
+  session, with the wagers that the app shows at each step.
 
 ## How-to guides — task-oriented
 
@@ -25,8 +25,10 @@ active voice, one meaning per word).
 
 ## Reference — information-oriented
 
-- [`reference/engine-api.md`](reference/engine-api.md) — every public
-  function and dataclass in `engine/`, with parameter and return-value tables.
+- [`reference/engine-api.md`](reference/engine-api.md) — each public
+  function, constant and dataclass in `engine/` (including the simulated
+  contestant behavior in `behavior.py`), with parameter and return-value
+  tables.
 
 ## Explanation — understanding-oriented
 
@@ -41,19 +43,25 @@ active voice, one meaning per word).
 
 - [`adr/0001-data-source-strategy.md`](adr/0001-data-source-strategy.md)
 - [`adr/0002-opponent-model-assumptions.md`](adr/0002-opponent-model-assumptions.md)
+  — superseded by ADR-0003; kept as the historical record.
+- [`adr/0003-simulated-contestant-behavior.md`](adr/0003-simulated-contestant-behavior.md)
+  — the tiebreaker rule and the simulated opponents of Tier 2 and the
+  Daily Double engine.
 - [`reviews/statistical-review-2026-07-23.md`](reviews/statistical-review-2026-07-23.md)
-  — first statistical review (Daily Double selection + strict-win tiebreak).
+  — first statistical review (Daily Double wager selection, and the
+  strict-win tiebreak that 2.0.0 removed).
 - [`reviews/statistical-review-2026-07-23-v2.md`](reviews/statistical-review-2026-07-23-v2.md)
   — referee-style second review (CRN-aware comparison variance + multiplicity).
 
 ## Presentation
 
-- [`deck.pptx`](deck.pptx) — a 12-slide plain-English overview; links the
-  white paper on the last slide.
+- [`deck.pptx`](deck.pptx) — a plain-English overview. The last slide
+  links the white paper.
 
 ## Generated PDFs
 
-Every Markdown document here has a PDF companion in
-[`../build/`](../build/). The Markdown is the source of truth; regenerate the
-PDF in the same pass when the source changes (see
+Each Markdown document here has a PDF companion in
+[`../build/`](../build/). The Markdown is the source of truth. When the
+source changes, regenerate the PDF in the same pass with
+`python build/md_to_pdf.py <source.md> build/<name>.pdf` (see
 [`how-to/maintain-the-project.md`](how-to/maintain-the-project.md)).

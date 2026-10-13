@@ -34,22 +34,49 @@ function check(name, cond, extra) {
 const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 
 // --- Exact Tier 2 Final Jeopardy values (hand-derived, must match Python) ---
+// Tie rule: a tie for first goes to a tiebreaker (half a win); nobody wins at $0.
 const OPP = [[0, 0.5], [5000, 0.5]];
-check('FJ no-wager win prob 0.75',
-  approx(outcomeProbabilities(9000, 0, 0.5, [{ score: 5000, dist: OPP, pCorrect: 0.5 }])[0], 0.75));
-check('FJ cover-bet win prob 0.875',
-  approx(outcomeProbabilities(9000, 1001, 0.5, [{ score: 5000, dist: OPP, pCorrect: 0.5 }])[0], 0.875));
+const opp1 = [{ score: 5000, dist: OPP, pCorrect: 0.5 }];
+check('FJ no-wager win prob 0.75', approx(expectedWinProbability(9000, 0, 0.5, opp1), 0.75));
+check('FJ cover-bet win prob 0.875', approx(expectedWinProbability(9000, 1001, 0.5, opp1), 0.875));
+check('FJ tie bet worth 0.8125 (tiebreaker)', approx(expectedWinProbability(9000, 1000, 0.5, opp1), 0.8125));
+check('FJ all-in worth 0.5 (no win at $0)', approx(expectedWinProbability(9000, 9000, 0.5, opp1), 0.5));
+check('FJ ceiling tie 0.95', approx(expectedWinProbability(10000, 0, 0.5,
+  [{ score: 5000, dist: [[0, 0.5], [2500, 0.3], [5000, 0.2]], pCorrect: 0.5 }]), 0.95));
+check('FJ correlated cover 0.825', approx(expectedWinProbability(9000, 1001, 0.5,
+  [{ score: 5000, dist: [[5000, 1]], pCorrect: 0.5 }], 0.3), 0.825, 1e-4));
 {
   const orig = defaultOpponentDist;
   defaultOpponentDist = () => OPP;
-  check('FJ strict-win tiebreak recommends 1001', fjTier2([9000, 5000], 0, 0.5, 0.5).recommendedWager === 1001);
-  defaultOpponentDist = orig;
-}
-{
-  const rec = fjTier2([4000, 9000, 10000], 0, 1.0, 0.5);
+  check('FJ recommends cover 1001, not tie 1000', fjTier2([9000, 5000], 0, 0.5, 0.5, 0).recommendedWager === 1001);
+  const dists = { 1: [[0, 0.5], [9000, 0.5]], 2: [[0, 1 / 3], [8001, 1 / 3], [10000, 1 / 3]] };
+  defaultOpponentDist = (s, i) => dists[i];
+  const rec = fjTier2([4000, 9000, 10000], 0, 1.0, 0.5, 0);
   check('3-way both-leaders-bust win prob 1/12', approx(rec.winProbability, 1 / 12));
   check('3-way recommends 0', rec.recommendedWager === 0);
+  defaultOpponentDist = orig;
 }
+
+// --- Simulated behavior (hand-derived, see tests/test_behavior.py) ---
+check('winShare two-way tie 0.5', winShare([100, 100], 0) === 0.5);
+check('winShare three-way tie 1/3', approx(winShare([100, 100, 100], 2), 1 / 3));
+check('winShare nobody wins at $0', winShare([0, 0, 0], 0) === 0);
+{
+  const d = Object.fromEntries(wagerDistribution([10000, 8000, 3000], 1));
+  const exp = { 8000: 0.308, 1999: 0.27, 2001: 0.15, 3999: 0.08, 0: 0.048, 2000: 0.048, 4000: 0.048, 6000: 0.048 };
+  check('B published regime weights', Object.keys(exp).length === Object.keys(d).length &&
+    Object.entries(exp).every(([w, p]) => approx(d[w], p, 1e-12)), JSON.stringify(d));
+  const a = Object.fromEntries(wagerDistribution([10000, 8000, 3000], 0));
+  check('A cover weights', approx(a[6001], 0.75, 1e-12) && approx(a[6000], 0.10, 1e-12) && approx(a[10000], 0.07, 1e-12));
+  const lock = Object.fromEntries(wagerDistribution([20000, 8000], 0));
+  check('A lockout weights', lock[0] === 0.5 && lock[3999] === 0.5);
+}
+{
+  const r = latentCorrelation(0.3);
+  const both = quadratureNodes().reduce((acc, [f, w]) => acc + w * conditionalAccuracy(0.5, f, r) ** 2, 0);
+  check('quadrature reproduces binary correlation 0.3', approx(both, 0.325, 1e-4));
+}
+check('shipped defaults: leader at 89% does not bet the tie', fjTier2([10000, 8000, 3400], 0, 0.89).recommendedWager !== 6000);
 
 // --- Inverse-normal / Bonferroni band reference values (must match Python) ---
 check('inverseNormalCdf(0.95) ~ 1.6449', approx(inverseNormalCdf(0.95), 1.6449, 1e-3));

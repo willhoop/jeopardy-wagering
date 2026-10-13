@@ -4,6 +4,71 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/). Dates are ISO 8601.
 
+## [2.0.0] - 2026-10-13
+
+Smart Bet now plays against simulated contestants and scores ties the way the
+show has since November 2014. The basis of every Tier 2 and Daily Double
+figure changes, so this is a MAJOR release.
+
+### Fixed
+
+- **Ties were scored as wins.** Tier 2 and the Daily Double rollouts counted a
+  tie for first as a full win, on the old co-champion rule. That rule ended
+  with the 24 November 2014 episode; a tie now goes to a tiebreaker clue and
+  only one player returns. A tie now scores 1/k of a win for a k-way tie, and
+  nobody wins at $0. Reported symptom: a leader with a $6,001 cover bet was
+  told to bet $6,000, which only ties second place if they double up. The
+  same case now recommends $6,001.
+
+### Added
+
+- `engine/behavior.py` — simulated contestant behavior, in one configuration
+  block: role-based Final Jeopardy wager mixes (leader, second, third),
+  published accuracy rates, and right/wrong outcomes correlated across all
+  players. Each value is marked PUBLISHED (Tesauro et al., 2013) or ASSUMED.
+  The app mirrors it in a `BEHAVIOR` object.
+- `docs/adr/0003-simulated-contestant-behavior.md` — the decision, the
+  sources, and the negative consequences.
+- `tests/test_behavior.py` (9 tests) and new hand-derived cases in
+  `tests/test_fj_bestresponse.py` and `tests/js_parity.js`: the tiebreaker
+  value of a tie bet, the published B weights, the correlation check.
+- `llms.txt` — a summary and links for AI agents (llmstxt.org format).
+
+### Changed
+
+- Tier 2 opponents: from a uniform split over Tier 1 breakpoints to the
+  simulated behavior above. Opponent accuracy stays 50%, now cited.
+- Final Jeopardy outcomes are correlated at 0.3 across all players, including
+  the user, instead of independent.
+- Daily Double rollouts: opponents draw simulated Final Jeopardy wagers;
+  future Daily Doubles are answered right 64% of the time (was 60%,
+  a placeholder).
+- Tier 2 search: removed the "strict win" secondary objective. Under the
+  tiebreaker rule a tie is already worth less than a win, so the patch is no
+  longer needed. Ties between wagers now go to the smallest wager.
+- The app's Daily Double calculation takes about twice as long, because
+  each rollout now simulates opponent wagers.
+
+### Removed
+
+- ADR-0002's placeholder opponent model. ADR-0002 is superseded by ADR-0003.
+
+### Record
+
+- **Measured.** Every Tier 2 and Daily Double recommendation and win
+  percentage, from `engine/fj_bestresponse.py`, `engine/dd_wager.py` and the
+  app. Example: leader 10,000 vs 8,000 vs 3,400 at 89% confidence now bets
+  $6,001 (Tier 1 cover) for a 91.7% win share.
+- **Basis.** CHANGED — a reader can no longer be told a win percentage that
+  counts ties as wins, or one computed against the uniform placeholder
+  opponent. Old and new percentages answer different questions.
+- **Supersedes.** ~~Tier 2 "ties count as wins"~~ retracted. ~~ADR-0002
+  uniform opponent model~~ retracted. All Tier 2 and Daily Double figures in
+  the white paper, deck and technical docs before 2.0.0 are replaced in this
+  release.
+- **Owed to the next major.** Nothing. The white paper, deck and technical
+  docs fold this change in this release.
+
 ## [1.4.0] - 2026-07-23
 
 Infrastructure and shipping-readiness release — no change to the model or the

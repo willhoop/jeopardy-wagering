@@ -2,8 +2,8 @@
 
 Given a player's own confidence in a Daily Double clue and a description of
 what's left in the game, this searches candidate wagers for the one that
-maximizes simulated win probability (ties count as wins, matching the show's
-actual rule). See engine/simulate.py for exactly what is and isn't modeled --
+maximizes simulated win probability. A tie for first goes to a tiebreaker
+clue, so it counts as an equal share of a win (engine/behavior.py). See engine/simulate.py for exactly what is and isn't modeled --
 this is deliberately simplified and documented as such.
 
 Legal wager bounds: a Daily Double wager may be up to the greater of the
@@ -94,7 +94,7 @@ def _standard_error(p: float, trials: int) -> float:
 def _paired_standard_error(wins_a: List[int], wins_b: List[int]) -> float:
     """Standard error of the mean paired difference between two wagers.
 
-    `wins_a` and `wins_b` are per-trial 0/1 win indicators for two candidate
+    `wins_a` and `wins_b` are per-trial win shares (0, 1/k or 1) for two candidate
     wagers evaluated on the SAME common random numbers. Because the two
     estimates are paired trial-by-trial, the variance of their difference is
     estimated directly from the per-trial differences, which correctly
@@ -199,7 +199,7 @@ def analyze(
                 trial_scores[player_index] += w
             else:
                 trial_scores[player_index] -= w
-            win_indicators[w].append(1 if rollout(trial_scores, player_index, config, rng) else 0)
+            win_indicators[w].append(rollout(trial_scores, player_index, config, rng))
 
     results: List[Tuple[int, float]] = [
         (w, sum(win_indicators[w]) / trials_per_wager) for w in candidate_wagers

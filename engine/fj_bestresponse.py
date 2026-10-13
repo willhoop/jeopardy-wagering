@@ -3,49 +3,37 @@
 Tier 1 (engine/fj_wager.py) answers "what wager can't hurt me if I'm
 right?" using a worst-case guarantee that ignores probability entirely.
 This module answers a different question: "given my actual confidence in
-the category, and some model of how my opponents tend to wager and answer,
-what wager maximizes my probability of winning?"
+the category, and how real contestants tend to wager and answer, what
+wager maximizes my chance of winning?"
 
-Ties for first place count as wins throughout, matching the show's actual
-rule that co-champions both advance to the next game.
+Scoring follows the current tie rule (since November 2014): a tie for first
+goes to a tiebreaker clue, so a k-way tie is worth 1/k of a win, and nobody
+wins at $0. See engine/behavior.py.
 
-IMPORTANT -- the opponent wagering model here is illustrative, not
-empirically calibrated. See docs/adr/0002-opponent-model-assumptions.md.
-The default model anchors each opponent's plausible wagers on their own
-Tier 1 breakpoints (their cover wager, their lock-tie wager, betting
-everything, betting zero) and spreads probability uniformly across
-whichever of those apply -- an honest "we don't know the real split, so
-don't pretend to" placeholder, not a fitted distribution. Pass a different
-`opponent_model_fn` once real calibration exists.
+Opponents follow the simulated contestant behavior in engine/behavior.py:
+role-based wager mixes (leader, second, third) anchored on Tesauro et al.
+(2013), 50% accuracy, and right/wrong outcomes that are correlated across
+all players (a hard clue is hard for everyone). The result is exact: we
+integrate over the shared difficulty factor and enumerate every wager and
+right/wrong branch, so there is no sampling noise.
 """
 
 from dataclasses import dataclass, field
 from itertools import product
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
+import behavior
 import fj_wager
 
-WagerDist = List[Tuple[int, float]]
+WagerDist = behavior.WagerDist
 
-DEFAULT_OPPONENT_CORRECTNESS = 0.5  # placeholder, not a fitted value
+DEFAULT_OPPONENT_CORRECTNESS = behavior.FJ_ACCURACY_AVERAGE
+DEFAULT_CORRELATION = behavior.FJ_OUTCOME_CORRELATION
 
 
 def default_opponent_wager_model(scores: Sequence[int], opponent_index: int) -> WagerDist:
-    """Illustrative opponent wager distribution, anchored on Tier 1 breakpoints.
-
-    Not empirically calibrated -- see module docstring.
-    """
-    rec = fj_wager.analyze(list(scores), opponent_index)
-    candidates = {0, rec.max_legal_wager}
-    if rec.min_wager_to_guarantee_win is not None:
-        candidates.add(rec.min_wager_to_guarantee_win)
-    if rec.lock_tie_wager is not None:
-        candidates.add(rec.lock_tie_wager)
-    candidates = sorted(c for c in candidates if 0 <= c <= rec.max_legal_wager)
-    if not candidates:
-        candidates = [0]
-    weight = 1.0 / len(candidates)
-    return [(c, weight) for c in candidates]
+    """Simulated human wager distribution (see engine/behavior.py)."""
+    return behavior.wager_distribution(scores, opponent_index)
 
 
 @dataclass
@@ -65,67 +53,63 @@ class FJBestResponse:
     notes: List[str] = field(default_factory=list)
 
 
-def _final_score(score: int, wager: int, correct: bool) -> int:
-    return score + wager if correct else score - wager
+def _opponent_table(
+    opponents: List[OpponentModel], p_self: float, binary_correlation: float
+) -> List[Tuple[float, float, Dict[Tuple[int, int], float]]]:
+    """For each quadrature node: (weight, P(self right | node), opponent table).
 
-
-def _outcome_probabilities(
-    self_score: int,
-    self_wager: int,
-    p_self_correct: float,
-    opponents: List[OpponentModel],
-) -> Tuple[float, float]:
-    """Exact (tie-inclusive win probability, strict win probability) for a wager.
-
-    Both are computed from the same enumeration over the discrete opponent
-    wager distributions supplied -- exact arithmetic, not a Monte Carlo
-    estimate, so there is no sampling noise here as long as the opponent
-    models are themselves discrete and finite.
-
-    The two numbers differ only in how a tie for first is scored: the first
-    counts a tie as a win (matching the show's actual rule that co-champions
-    both advance); the second requires an outright, undisputed lead. The gap
-    between them exists purely to break ties in `analyze()` -- see the
-    comment there for why that matters.
+    The opponent table maps (best opponent final score, how many opponents
+    share it) to its probability, given the node.
     """
-    win_total = 0.0
-    strict_total = 0.0
-    for self_correct in (True, False):
-        p_self = p_self_correct if self_correct else (1 - p_self_correct)
-        if p_self == 0:
-            continue
-        self_final = _final_score(self_score, self_wager, self_correct)
-
-        per_opponent_branches = []
+    r = behavior.latent_correlation(binary_correlation) if binary_correlation > 0 else 0.0
+    nodes = behavior.quadrature_nodes() if r > 0 else [(0.0, 1.0)]
+    table = []
+    for factor, weight in nodes:
+        branches = []
         for opp in opponents:
-            branches = []
-            for wager, w_prob in opp.wager_dist:
-                for correct in (True, False):
-                    p = w_prob * (opp.p_correct if correct else (1 - opp.p_correct))
-                    if p == 0:
+            pc = behavior.conditional_accuracy(opp.p_correct, factor, r)
+            b: Dict[int, float] = {}
+            for wager, wp in opp.wager_dist:
+                for correct, p in ((True, pc), (False, 1 - pc)):
+                    if wp * p == 0:
                         continue
-                    branches.append((_final_score(opp.score, wager, correct), p))
-            per_opponent_branches.append(branches)
+                    final = opp.score + wager if correct else opp.score - wager
+                    b[final] = b.get(final, 0.0) + wp * p
+            branches.append(list(b.items()))
+        tops: Dict[Tuple[int, int], float] = {}
+        for combo in product(*branches):
+            p = 1.0
+            finals = []
+            for final, pp in combo:
+                p *= pp
+                finals.append(final)
+            if not finals:
+                key = (None, 0)
+            else:
+                m = max(finals)
+                key = (m, finals.count(m))
+            tops[key] = tops.get(key, 0.0) + p
+        table.append((weight, behavior.conditional_accuracy(p_self, factor, r), tops))
+    return table
 
-        if not per_opponent_branches:
-            win_total += p_self  # solo game -- always "wins"
-            strict_total += p_self
-            continue
 
-        for combo in product(*per_opponent_branches):
-            p_combo = p_self
-            opp_finals = []
-            for final, p in combo:
-                p_combo *= p
-                opp_finals.append(final)
-            if p_combo == 0:
-                continue
-            opp_max = max(opp_finals)
-            if self_final >= opp_max:
-                win_total += p_combo
-            if self_final > opp_max:
-                strict_total += p_combo
-    return win_total, strict_total
+def _share(self_final: int, top, count: int) -> float:
+    if top is None:
+        return 1.0
+    if self_final > top:
+        return 1.0 if self_final > 0 else 0.0  # nobody wins at $0 or less
+    if self_final == top:
+        return behavior.win_share([self_final] + [top] * count, 0)
+    return 0.0
+
+
+def _expected_share(self_score: int, wager: int, table) -> float:
+    total = 0.0
+    up, down = self_score + wager, self_score - wager
+    for weight, ps, tops in table:
+        for (top, count), p in tops.items():
+            total += weight * p * (ps * _share(up, top, count) + (1 - ps) * _share(down, top, count))
+    return total
 
 
 def expected_win_probability(
@@ -133,14 +117,15 @@ def expected_win_probability(
     self_wager: int,
     p_self_correct: float,
     opponents: List[OpponentModel],
+    correlation: float = 0.0,
 ) -> float:
-    """Exact expected P(self ties or beats every opponent) for a given wager.
+    """Exact expected win share for one wager (ties settled by tiebreaker).
 
-    Kept as a standalone function (rather than folded away) because the
-    hand-derived tests in tests/test_fj_bestresponse.py call it directly.
+    `correlation` defaults to 0 here so hand-derived tests can use
+    independent outcomes; `analyze()` uses the published value.
     """
-    win, _strict = _outcome_probabilities(self_score, self_wager, p_self_correct, opponents)
-    return win
+    table = _opponent_table(opponents, p_self_correct, correlation)
+    return _expected_share(self_score, self_wager, table)
 
 
 def analyze(
@@ -149,9 +134,10 @@ def analyze(
     p_self_correct: float,
     opponent_model_fn: Callable[[Sequence[int], int], WagerDist] = default_opponent_wager_model,
     opponent_correctness: float = DEFAULT_OPPONENT_CORRECTNESS,
+    correlation: float = DEFAULT_CORRELATION,
     wager_step: int = 100,
 ) -> FJBestResponse:
-    """Search for the wager maximizing expected win probability (ties count as wins)."""
+    """Search for the wager with the highest expected win share."""
     if not 0 <= player_index < len(scores):
         raise ValueError("player_index out of range")
 
@@ -174,35 +160,25 @@ def analyze(
     candidate_wagers.add(max_wager)
     if tier1.min_wager_to_guarantee_win is not None:
         candidate_wagers.add(tier1.min_wager_to_guarantee_win)
+        candidate_wagers.add(tier1.min_wager_to_guarantee_win - 1)
     if tier1.lock_tie_wager is not None:
         candidate_wagers.add(tier1.lock_tie_wager)
     candidate_wagers = sorted(w for w in candidate_wagers if 0 <= w <= max_wager)
 
-    outcomes = {
-        w: _outcome_probabilities(self_score, w, p_self_correct, opponents)
-        for w in candidate_wagers
-    }
-    results = [(w, win) for w, (win, _strict) in outcomes.items()]
+    table = _opponent_table(opponents, p_self_correct, correlation)
+    results = [(w, _expected_share(self_score, w, table)) for w in candidate_wagers]
 
     best_prob = max(p for _, p in results)
-    tied = [w for w, p in results if p >= best_prob - 1e-9]
-    # Among wagers that achieve the same win probability (ties for first
-    # counted as wins), prefer whichever wins *outright* more often, then the
-    # smallest wager. Without this, the search is indifferent between a
-    # wager that only ties the leader and one that beats them outright,
-    # even when the larger wager costs nothing extra in expectation (e.g.
-    # at 100% confidence, where there is no downside to betting the extra
-    # dollar). Settling for a gratuitous tie when a free strict win is
-    # available is a real defect, not a stylistic choice -- see the
-    # CHANGELOG entry for the case that surfaced it.
-    best_wager = min(tied, key=lambda w: (-outcomes[w][1], w))
+    # Among wagers within rounding of the best, take the smallest.
+    best_wager = min(w for w, p in results if p >= best_prob - 1e-9)
 
     notes = [
-        "Opponent wagering model is illustrative (uniform over each "
-        "opponent's own Tier 1 breakpoints), not empirically calibrated -- "
-        "see docs/adr/0002-opponent-model-assumptions.md.",
-        f"Opponent correctness probability assumed at {opponent_correctness:.0%} "
-        "for all opponents -- a placeholder, not a fitted value.",
+        "Ties for first go to a tiebreaker clue (rule since November 2014), "
+        "scored as an equal share of the win.",
+        "Opponents follow simulated contestant behavior anchored on Tesauro "
+        "et al. (2013) -- see engine/behavior.py and ADR-0003.",
+        f"Opponent accuracy {opponent_correctness:.0%}, outcome correlation "
+        f"{correlation:.2f} across all players.",
     ]
 
     return FJBestResponse(

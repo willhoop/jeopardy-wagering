@@ -5,7 +5,8 @@ scenarios, and get graded against the optimal play.
 
 ## Steps
 
-1. Open `app/index.html` and click the **Quiz Me** tab.
+1. Open the app (<https://willhoop.github.io/jeopardy-wagering/app/> or
+   `app/index.html`). Click the **Quiz Me** tab.
 2. Click **New Scenario**. The app shows a random Daily Double or Final
    Jeopardy setup, with scores for you and each rival.
 3. Read the scenario text. It states the round, the confidence you should

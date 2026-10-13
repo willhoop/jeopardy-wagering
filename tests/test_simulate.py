@@ -10,14 +10,14 @@ import simulate  # noqa: E402
 
 
 def test_wins_hand_derived():
-    # Hand-derived: player 0 (score 100) ties player 1 (score 100) -> counts as a win.
-    assert simulate.wins([100, 100], 0) is True
+    # Tie for first goes to a tiebreaker: a two-way tie is half a win.
+    assert simulate.wins([100, 100], 0) == 0.5
     # Player 0 (50) strictly behind player 1 (100) -> not a win.
-    assert simulate.wins([50, 100], 0) is False
+    assert simulate.wins([50, 100], 0) == 0.0
     # Player 0 strictly ahead of both others -> win.
-    assert simulate.wins([300, 100, 200], 0) is True
+    assert simulate.wins([300, 100, 200], 0) == 1.0
     # Solo game -- always a win.
-    assert simulate.wins([1], 0) is True
+    assert simulate.wins([1], 0) == 1.0
 
 
 def test_remaining_regular_clues_deterministic_with_seed():
@@ -46,9 +46,9 @@ def test_simulate_final_jeopardy_lockout_player_does_not_wager():
     # Regardless of fj_confidence, player 0's wager should be 0, so their
     # score is unchanged whether "correct" or not.
     rng_correct = random.Random(1)
-    result_correct = simulate.simulate_final_jeopardy([12000, 5000], fj_confidence=1.0, rng=rng_correct)
+    result_correct = simulate.simulate_final_jeopardy([12000, 5000], 0, fj_confidence=1.0, rng=rng_correct)
     rng_wrong = random.Random(1)
-    result_wrong = simulate.simulate_final_jeopardy([12000, 5000], fj_confidence=0.0, rng=rng_wrong)
+    result_wrong = simulate.simulate_final_jeopardy([12000, 5000], 0, fj_confidence=0.0, rng=rng_wrong)
     assert result_correct[0] == 12000
     assert result_wrong[0] == 12000
 
@@ -57,5 +57,5 @@ def test_simulate_final_jeopardy_cover_bet_player_wagers_and_can_lose():
     # Player 0 has 9000, player 1 has 5000 -- Tier 1 cover wager is 1001.
     # With fj_confidence=0.0 (guaranteed wrong), player 0 should drop by 1001.
     rng = random.Random(2)
-    result = simulate.simulate_final_jeopardy([9000, 5000], fj_confidence=0.0, rng=rng)
+    result = simulate.simulate_final_jeopardy([9000, 5000], 0, fj_confidence=0.0, rng=rng)
     assert result[0] == 9000 - 1001

@@ -9,19 +9,20 @@ simplified, and the simplifications are named here rather than hidden:
   player with a fixed probability; the model does not simulate buzzer
   competition, and a wrong answer does not pass the clue to another player
   the way it would on the real show.
-- Final Jeopardy inside a rollout is resolved using the Tier 1 (fj_wager)
-  closed-form cover-bet logic, for speed -- not the full Tier 2
-  opponent-modeled search. Tier 2 (fj_bestresponse) remains available as a
-  standalone, more careful one-shot tool for an actual Final Jeopardy
-  decision; running it inside every Monte Carlo trial here would be far too
-  slow.
+- Final Jeopardy inside a rollout: the player being advised uses the Tier 1
+  (fj_wager) cover-bet logic, for speed. Opponents draw a wager from the
+  simulated contestant behavior in engine/behavior.py. Right/wrong outcomes
+  are correlated across all players (engine/behavior.py).
+- The result of a rollout is a win share under the tiebreaker rule: 1 for
+  an outright win, 1/k for a k-way tie for first, 0 otherwise.
 - Future Daily Doubles (when `remaining_dd_count` > 0) use a crude
   placeholder: a uniformly random player finds it and wagers a fixed
   fraction of their own score, at a fixed accuracy rate. This has not been
   validated and should be refined before trusting multi-DD-ahead results --
   see RISK_REGISTER.md.
 
-All default rates below are placeholders, not fitted values. Override them
+Defaults marked "published" come from Tesauro et al. (2013) via engine/behavior.py;
+the rest are placeholders, not fitted values. Override any of them
 via RolloutConfig once better numbers exist.
 """
 
@@ -29,12 +30,13 @@ import random
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+import behavior
 import fj_wager
 
 DEFAULT_REGULAR_CLUE_SUCCESS_RATE = 0.6  # placeholder: P(someone answers a given clue correctly)
-DEFAULT_FJ_CONFIDENCE = 0.5  # placeholder: assumed average Final Jeopardy correctness
+DEFAULT_FJ_CONFIDENCE = behavior.FJ_ACCURACY_AVERAGE  # published, Tesauro et al. (2013)
 DEFAULT_FUTURE_DD_WAGER_FRACTION = 0.5  # placeholder: future-DD finder's bet as a fraction of their score
-DEFAULT_FUTURE_DD_SUCCESS_RATE = 0.6  # placeholder: future-DD accuracy
+DEFAULT_FUTURE_DD_SUCCESS_RATE = behavior.DD_ACCURACY_AVERAGE  # published, Tesauro et al. (2013)
 
 
 def simulate_remaining_regular_clues(
@@ -73,38 +75,49 @@ def simulate_future_daily_doubles(
     return scores
 
 
+def tier1_wager(scores: List[int], i: int) -> int:
+    """The advised player's Final Jeopardy wager inside a rollout."""
+    rec = fj_wager.analyze(scores, i)
+    if rec.lockout:
+        return 0
+    if rec.lock_tie_wager is not None:
+        return rec.lock_tie_wager
+    if rec.min_wager_to_guarantee_win is not None:
+        return rec.min_wager_to_guarantee_win
+    return rec.max_legal_wager
+
+
 def simulate_final_jeopardy(
     scores: List[int],
+    player_index: int,
     fj_confidence: float = DEFAULT_FJ_CONFIDENCE,
+    opponent_accuracy: float = behavior.FJ_ACCURACY_AVERAGE,
+    correlation: float = behavior.FJ_OUTCOME_CORRELATION,
     rng: Optional[random.Random] = None,
 ) -> List[int]:
-    """Resolve Final Jeopardy using each player's Tier 1 cover-bet wager."""
+    """Resolve Final Jeopardy: Tier 1 wager for the advised player,
+    simulated human wagers for opponents, correlated right/wrong outcomes."""
     rng = rng or random
     scores = list(scores)
     wagers = []
+    ps = []
     for i in range(len(scores)):
-        rec = fj_wager.analyze(scores, i)
-        if rec.lockout:
-            wagers.append(0)
-        elif rec.lock_tie_wager is not None:
-            wagers.append(rec.lock_tie_wager)
-        elif rec.min_wager_to_guarantee_win is not None:
-            wagers.append(rec.min_wager_to_guarantee_win)
+        if i == player_index:
+            wagers.append(tier1_wager(scores, i))
+            ps.append(fj_confidence)
         else:
-            wagers.append(rec.max_legal_wager)
+            wagers.append(behavior.sample_wager(behavior.wager_distribution(scores, i), rng))
+            ps.append(opponent_accuracy)
+    r = behavior.latent_correlation(correlation) if correlation > 0 else 0.0
+    correct = behavior.sample_correct(ps, r, rng)
     for i, w in enumerate(wagers):
-        if rng.random() < fj_confidence:
-            scores[i] += w
-        else:
-            scores[i] -= w
+        scores[i] += w if correct[i] else -w
     return scores
 
 
-def wins(scores: List[int], player_index: int) -> bool:
-    """True if player_index ties or beats every other player (ties count as wins)."""
-    self_score = scores[player_index]
-    others = [s for i, s in enumerate(scores) if i != player_index]
-    return self_score >= max(others) if others else True
+def wins(scores: List[int], player_index: int) -> float:
+    """Win share under the tiebreaker rule (see behavior.win_share)."""
+    return behavior.win_share(scores, player_index)
 
 
 @dataclass
@@ -113,6 +126,8 @@ class RolloutConfig:
     remaining_dd_count: int = 0
     regular_clue_success_rate: float = DEFAULT_REGULAR_CLUE_SUCCESS_RATE
     fj_confidence: float = DEFAULT_FJ_CONFIDENCE
+    opponent_fj_accuracy: float = behavior.FJ_ACCURACY_AVERAGE
+    fj_correlation: float = behavior.FJ_OUTCOME_CORRELATION
     future_dd_wager_fraction: float = DEFAULT_FUTURE_DD_WAGER_FRACTION
     future_dd_success_rate: float = DEFAULT_FUTURE_DD_SUCCESS_RATE
 
@@ -122,8 +137,8 @@ def rollout(
     player_index: int,
     config: RolloutConfig,
     rng: Optional[random.Random] = None,
-) -> bool:
-    """Simulate one full game continuation from `scores`. Return True if player_index wins."""
+) -> float:
+    """Simulate one game continuation from `scores`. Return player_index's win share."""
     rng = rng or random
     s = simulate_remaining_regular_clues(
         scores, config.remaining_clue_values, config.regular_clue_success_rate, rng
@@ -136,5 +151,12 @@ def rollout(
             config.future_dd_success_rate,
             rng,
         )
-    s = simulate_final_jeopardy(s, config.fj_confidence, rng)
+    s = simulate_final_jeopardy(
+        s,
+        player_index,
+        config.fj_confidence,
+        config.opponent_fj_accuracy,
+        config.fj_correlation,
+        rng,
+    )
     return wins(s, player_index)

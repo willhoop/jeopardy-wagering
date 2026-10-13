@@ -462,17 +462,18 @@
       <p>There are two different questions this tool can answer, and they're not the same question:</p>
       <ul class="explain-list">
         <li><strong>Safe Bet (Tier 1):</strong> "What wager can't hurt me if I'm right?" This assumes your opponents play the worst possible way against you — betting everything and getting it right — and finds the wager that beats that no matter what. It needs no guess about your confidence at all.</li>
-        <li><strong>Smart Bet (Tier 2 / Daily Double engine):</strong> "Given how sure I actually am, and a guess at how opponents tend to bet, what wager gives me the best real odds of winning?" This one uses your confidence slider and can recommend a smaller, less paranoid wager than the Safe Bet when it's justified.</li>
+        <li><strong>Smart Bet (Tier 2 / Daily Double engine):</strong> "Given how sure I actually am, and how real contestants tend to bet and answer, what wager gives me the best real odds of winning?" This one uses your confidence slider and can recommend a smaller, less paranoid wager than the Safe Bet when it's justified.</li>
       </ul>
-      <p>The Smart Bet's opponent-behavior assumptions are honest placeholders, not numbers pulled from thousands of real games — see <code>docs/adr/0002-opponent-model-assumptions.md</code> in the project for the details. Treat its exact win-probability numbers as directionally useful, not gospel.</p>
-      <p>The underlying math lives in Python at <code>engine/fj_wager.py</code>, <code>engine/fj_bestresponse.py</code>, <code>engine/simulate.py</code>, and <code>engine/dd_wager.py</code>, with tests in <code>tests/</code>. This page is a hand-written JavaScript port of that same logic so it can run instantly in a browser — it mirrors the Python engine but is not itself covered by the automated test suite yet.</p>
+      <p><strong>Simulated opponents.</strong> Smart Bet plays your rivals as simulated contestants, built from IBM's published study of about 3,000 real games (Tesauro et al., 2013). The leader usually bets to cover second place's doubled score. Second place mixes going all-in, keeping third place out, overtaking the leader and the small "two-thirds" bet, in the proportions that study published. Third place bets with no pattern. Rivals answer Final Jeopardy right half the time, and a hard clue tends to be hard for everyone. Some of these numbers come straight from the study; the rest are our assumptions, labeled as such in <code>docs/adr/0003-simulated-contestant-behavior.md</code>. Treat the exact win percentages as a guide, not gospel.</p>
+      <p><strong>Ties.</strong> Since November 2014, a tie for first place goes to a tiebreaker clue. Only one player comes back. So a tie counts as half a win here (a third, for a three-way tie), and nobody wins at $0. Betting to tie is almost never free: the extra dollar usually turns the tie into a win.</p>
+      <p>The underlying math lives in Python at <code>engine/fj_wager.py</code>, <code>engine/fj_bestresponse.py</code>, <code>engine/simulate.py</code>, and <code>engine/dd_wager.py</code>, with tests in <code>tests/</code>. This page is a hand-written JavaScript port of that same logic so it can run in a browser. A parity script in <code>tests/js_parity.js</code> checks it against hand-derived values on every push.</p>
     </div>
   </section>
 
 </main>
 
 <footer>
-  Jeopardy! Wager Trainer — practice tool, not affiliated with the show.<br>
+  Jeopardy! Wager Trainer v2.0.0 — practice tool, not affiliated with the show.<br>
   Built by <a href="https://willhoop.github.io/" target="_blank" rel="noopener">willhoop.github.io</a>
 </footer>
 
@@ -520,65 +521,220 @@ function fjTier1(scores, playerIndex) {
   return { lockout, minWager, maxWager, lockTieWager, bindingIndex };
 }
 
-function defaultOpponentDist(scores, oppIdx) {
-  const rec = fjTier1(scores, oppIdx);
-  const cands = new Set([0, rec.maxWager]);
-  if (rec.minWager != null) cands.add(rec.minWager);
-  if (rec.lockTieWager != null) cands.add(rec.lockTieWager);
-  const arr = [...cands].filter(c => c >= 0 && c <= rec.maxWager).sort((a, b) => a - b);
-  const w = 1 / arr.length;
-  return arr.map(c => [c, w]);
+/* ---------- Simulated contestant behavior (mirrors engine/behavior.py) ----------
+   One configuration block. PUBLISHED = Tesauro et al. (2013), JAIR 47:205-251.
+   Tie rule: since 24 Nov 2014 a tie for first goes to a tiebreaker clue. */
+const BEHAVIOR = {
+  tiebreakerRule: true,
+  fjAccuracyAverage: 0.50,      // PUBLISHED
+  fjOutcomeCorrelation: 0.30,   // PUBLISHED (binary, at 50% accuracy)
+  ddAccuracyAverage: 0.64,      // PUBLISHED
+  bWeights: { bankroll: 0.26, keepout_c: 0.27, overtake_a: 0.15, two_thirds: 0.08, random: 0.24 }, // PUBLISHED for B>=3/4A, B>=2C
+  aWeights: { cover: 0.75, cover_tie: 0.10, bankroll: 0.05, random: 0.10 }, // ASSUMED
+  aLockoutWeights: { zero: 0.5, max_safe: 0.5 }, // ASSUMED
+  randomGridQuarters: [0, 1, 2, 3, 4],
+  quadHalfWidth: 6.0,
+  quadStep: 0.25,
+};
+
+function latentCorrelation(binary) { return Math.sin(binary * Math.PI / 2); }
+
+// erfc, Numerical Recipes "erfcc" (fractional error < 1.2e-7).
+function erfc(x) {
+  const z = Math.abs(x), t = 1 / (1 + 0.5 * z);
+  const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 +
+    t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))));
+  return x >= 0 ? r : 2 - r;
 }
+function normalCdf(x) {
+  if (x === Infinity) return 1;
+  if (x === -Infinity) return 0;
+  return 0.5 * erfc(-x / Math.SQRT2);
+}
+function inverseNormalCdfRefined(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const x = inverseNormalCdf(p);
+  const e = normalCdf(x) - p;
+  const u = e * Math.sqrt(2 * Math.PI) * Math.exp(x * x / 2);
+  return x - u / (1 + x * u / 2);
+}
+
+// Win share under the tiebreaker rule: 1 outright, 1/k for a k-way tie,
+// 0 otherwise. Nobody wins at $0 or less.
+function winShare(finals, i) {
+  const top = Math.max(...finals);
+  if (finals[i] < top) return 0;
+  if (finals.length > 1 && top <= 0) return 0;
+  if (!BEHAVIOR.tiebreakerRule) return 1;
+  return 1 / finals.filter(s => s === top).length;
+}
+
+// Plain arrays, not Maps: this runs inside every Daily Double rollout.
+function behaviorMix(score, weights, bets) {
+  let total = 0;
+  for (const k in weights) if (k === 'random' || bets[k] != null) total += weights[k];
+  const ws = [], ps = [];
+  const add = (w, p) => {
+    const j = ws.indexOf(w);
+    if (j >= 0) ps[j] += p; else { ws.push(w); ps.push(p); }
+  };
+  for (const k in weights) {
+    if (k !== 'random' && bets[k] == null) continue;
+    const share = weights[k] / total;
+    if (k === 'random') {
+      const q = BEHAVIOR.randomGridQuarters;
+      for (let g = 0; g < q.length; g++) add(Math.floor(score * q[g] / 4), share / q.length);
+    } else {
+      add(Math.min(Math.max(bets[k], 0), score), share);
+    }
+  }
+  const out = ws.map((w, j) => [w, ps[j]]);
+  out.sort((x, y) => x[0] - y[0]);
+  return out;
+}
+
+// Rollouts revisit the same score lines often, so cache the result.
+const wagerDistCache = new Map();
+function wagerDistribution(scores, idx) {
+  const key = scores.join(',') + '#' + idx;
+  let d = wagerDistCache.get(key);
+  if (d === undefined) {
+    if (wagerDistCache.size > 100000) wagerDistCache.clear();
+    d = wagerDistributionUncached(scores, idx);
+    wagerDistCache.set(key, d);
+  }
+  return d;
+}
+function wagerDistributionUncached(scores, idx) {
+  const me = scores[idx];
+  if (me <= 0) return [[0, 1]];
+  const order = scores.map((_, i) => i).sort((x, y) => (scores[y] - scores[x]) || (x - y));
+  const rank = order.indexOf(idx);
+  const ranked = order.map(i => scores[i]).concat([0, 0]);
+  const a = ranked[0], b = ranked[1], c = ranked[2];
+  const hasB = scores.length >= 2 && b > 0;
+  const hasC = scores.length >= 3 && c > 0;
+  if (rank === 0) {
+    if (!hasB) return [[0, 1]];
+    if (a > 2 * b) return behaviorMix(me, BEHAVIOR.aLockoutWeights, { zero: 0, max_safe: a - 2 * b - 1 });
+    return behaviorMix(me, BEHAVIOR.aWeights, { cover: 2 * b - a + 1, cover_tie: 2 * b - a, bankroll: me });
+  }
+  if (rank === 1) {
+    let keepout = null;
+    if (hasC) {
+      keepout = b > 2 * c ? b - 2 * c - 1 : 2 * c - b + 1;
+      if (keepout > b) keepout = null;
+    }
+    const overtake = a - b + 1 <= b ? a - b + 1 : null;
+    const twoThirds = 3 * b - 2 * a > 0 ? 3 * b - 2 * a - 1 : null;
+    return behaviorMix(me, BEHAVIOR.bWeights, { bankroll: me, keepout_c: keepout, overtake_a: overtake, two_thirds: twoThirds });
+  }
+  return behaviorMix(me, { random: 1 }, {});
+}
+
+function quadratureNodes() {
+  const n = Math.round(BEHAVIOR.quadHalfWidth / BEHAVIOR.quadStep);
+  const xs = [];
+  for (let k = -n; k <= n; k++) xs.push(k * BEHAVIOR.quadStep);
+  const ws = xs.map(x => Math.exp(-x * x / 2));
+  const total = ws.reduce((a, b) => a + b, 0);
+  return xs.map((x, i) => [x, ws[i] / total]);
+}
+
+function conditionalAccuracy(p, f, r) {
+  if (p <= 0) return 0;
+  if (p >= 1) return 1;
+  if (r <= 0) return p;
+  return normalCdf((inverseNormalCdfRefined(p) - Math.sqrt(r) * f) / Math.sqrt(1 - r));
+}
+
+function gaussian(rng) {
+  let u = 0;
+  while (u === 0) u = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
+}
+const thresholdCache = new Map();
+function threshold(p) {
+  let t = thresholdCache.get(p);
+  if (t === undefined) { t = inverseNormalCdfRefined(p); thresholdCache.set(p, t); }
+  return t;
+}
+function sampleCorrect(ps, r, rng) {
+  const f = gaussian(rng), a = Math.sqrt(r), b = Math.sqrt(1 - r);
+  return ps.map(p => a * f + b * gaussian(rng) < threshold(p));
+}
+function sampleWager(dist, rng) {
+  const u = rng();
+  let acc = 0;
+  for (const [w, p] of dist) { acc += p; if (u < acc) return w; }
+  return dist[dist.length - 1][0];
+}
+
+function defaultOpponentDist(scores, oppIdx) { return wagerDistribution(scores, oppIdx); }
 
 function* cartesian(arrs, idx = 0, acc = []) {
   if (idx === arrs.length) { yield acc; return; }
   for (const item of arrs[idx]) yield* cartesian(arrs, idx + 1, [...acc, item]);
 }
 
-// Returns [tie-inclusive win probability, strict win probability] for one
-// candidate wager -- exact enumeration, no Monte Carlo noise here. The two
-// numbers differ only in whether an exact tie for first counts (the show's
-// real rule says yes). The gap between them is used purely to break ties:
-// see fjTier2() below for why that matters.
-function outcomeProbabilities(selfScore, selfWager, pSelf, opponents) {
-  let winTotal = 0;
-  let strictTotal = 0;
-  for (const selfCorrect of [true, false]) {
-    const pS = selfCorrect ? pSelf : 1 - pSelf;
-    if (pS === 0) continue;
-    const selfFinal = selfCorrect ? selfScore + selfWager : selfScore - selfWager;
-
-    const branchesList = opponents.map(o => {
-      const b = [];
+// Per quadrature node: [weight, P(self right | node), Map("top|count" -> p)].
+// Exact: integrates over the shared clue-difficulty factor and enumerates
+// every opponent wager and right/wrong branch. No Monte Carlo noise.
+function opponentTable(opponents, pSelf, correlation) {
+  const r = correlation > 0 ? latentCorrelation(correlation) : 0;
+  const nodes = r > 0 ? quadratureNodes() : [[0, 1]];
+  return nodes.map(([f, weight]) => {
+    const branches = opponents.map(o => {
+      const pc = conditionalAccuracy(o.pCorrect, f, r);
+      const b = new Map();
       for (const [w, wp] of o.dist) {
-        for (const correct of [true, false]) {
-          const p = wp * (correct ? o.pCorrect : 1 - o.pCorrect);
-          if (p === 0) continue;
-          b.push([correct ? o.score + w : o.score - w, p]);
+        for (const [correct, p] of [[true, pc], [false, 1 - pc]]) {
+          if (wp * p === 0) continue;
+          const final = correct ? o.score + w : o.score - w;
+          b.set(final, (b.get(final) || 0) + wp * p);
         }
       }
-      return b;
+      return [...b.entries()];
     });
-
-    if (branchesList.length === 0) { winTotal += pS; strictTotal += pS; continue; }
-
-    for (const combo of cartesian(branchesList)) {
-      let p = pS;
-      let maxOpp = -Infinity;
-      for (const [final, pp] of combo) { p *= pp; if (final > maxOpp) maxOpp = final; }
-      if (p === 0) continue;
-      if (selfFinal >= maxOpp) winTotal += p;
-      if (selfFinal > maxOpp) strictTotal += p;
+    const tops = new Map();
+    for (const combo of cartesian(branches)) {
+      let p = 1;
+      const finals = [];
+      for (const [final, pp] of combo) { p *= pp; finals.push(final); }
+      let key;
+      if (finals.length === 0) key = 'none';
+      else { const m = Math.max(...finals); key = m + '|' + finals.filter(x => x === m).length; }
+      tops.set(key, (tops.get(key) || 0) + p);
     }
+    return [weight, conditionalAccuracy(pSelf, f, r), tops];
+  });
+}
+
+function shareVsTop(selfFinal, key) {
+  if (key === 'none') return 1;
+  const [top, count] = key.split('|').map(Number);
+  if (selfFinal > top) return selfFinal > 0 ? 1 : 0;
+  if (selfFinal === top) return winShare([selfFinal].concat(Array(count).fill(top)), 0);
+  return 0;
+}
+
+function expectedShare(selfScore, wager, table) {
+  let total = 0;
+  const up = selfScore + wager, down = selfScore - wager;
+  for (const [weight, ps, tops] of table) {
+    for (const [key, p] of tops) total += weight * p * (ps * shareVsTop(up, key) + (1 - ps) * shareVsTop(down, key));
   }
-  return [winTotal, strictTotal];
+  return total;
 }
 
-function expectedWinProbability(selfScore, selfWager, pSelf, opponents) {
-  return outcomeProbabilities(selfScore, selfWager, pSelf, opponents)[0];
+// Exact expected win share for one wager. correlation defaults to 0 so the
+// hand-derived parity checks use independent outcomes.
+function expectedWinProbability(selfScore, selfWager, pSelf, opponents, correlation = 0) {
+  return expectedShare(selfScore, selfWager, opponentTable(opponents, pSelf, correlation));
 }
 
-function fjTier2(scores, playerIndex, pSelf, oppCorrect = 0.5) {
+function fjTier2(scores, playerIndex, pSelf, oppCorrect = BEHAVIOR.fjAccuracyAverage, correlation = BEHAVIOR.fjOutcomeCorrelation) {
   const selfScore = scores[playerIndex];
   const maxWager = legalMaxWager(selfScore);
   const opponents = scores
@@ -591,26 +747,15 @@ function fjTier2(scores, playerIndex, pSelf, oppCorrect = 0.5) {
   const step = Math.max(1, Math.round(maxWager / 30) || 1);
   for (let w = 0; w <= maxWager; w += step) candidateSet.add(w);
   candidateSet.add(maxWager);
-  if (tier1.minWager != null) candidateSet.add(tier1.minWager);
+  if (tier1.minWager != null) { candidateSet.add(tier1.minWager); candidateSet.add(tier1.minWager - 1); }
   if (tier1.lockTieWager != null) candidateSet.add(tier1.lockTieWager);
   const candidates = [...candidateSet].filter(w => w >= 0 && w <= maxWager).sort((a, b) => a - b);
 
-  const outcomes = {};
-  const results = candidates.map(w => {
-    const [win, strict] = outcomeProbabilities(selfScore, w, pSelf, opponents);
-    outcomes[w] = strict;
-    return [w, win];
-  });
+  const table = opponentTable(opponents, pSelf, correlation);
+  const results = candidates.map(w => [w, expectedShare(selfScore, w, table)]);
   const bestProb = Math.max(...results.map(r => r[1]));
-  const tied = results.filter(r => r[1] >= bestProb - 1e-9).map(r => r[0]);
-  // Among wagers tied on win probability (ties for first counted as wins),
-  // prefer whichever wins outright more often, then the smallest wager.
-  // Without this, a wager that only ties the leader looks identical to one
-  // that beats them outright even when the bigger wager costs nothing
-  // extra in expectation (e.g. at 100% confidence). Settling for a
-  // gratuitous tie there is a real defect, not a style choice.
-  tied.sort((a, b) => (outcomes[b] - outcomes[a]) || (a - b));
-  const bestWager = tied[0];
+  // Among wagers within rounding of the best, take the smallest.
+  const bestWager = Math.min(...results.filter(r => r[1] >= bestProb - 1e-9).map(r => r[0]));
 
   return { recommendedWager: bestWager, winProbability: bestProb, results, tier1CoverWager: tier1.minWager, tier1LockTie: tier1.lockTieWager, tier1Lockout: tier1.lockout };
 }
@@ -643,19 +788,20 @@ function simulateRestOfGame(scores, playerIndex, remainingClueValues, remainingD
     const wager = Math.floor(Math.max(s[finder], 0) * futureDDFraction);
     if (rng() < futureDDSuccessRate) s[finder] += wager; else s[finder] -= wager;
   }
+  // Final Jeopardy: the advised player uses the Tier 1 rule; opponents draw
+  // a simulated human wager; right/wrong outcomes are correlated.
   const wagers = s.map((_, i) => {
+    if (i !== playerIndex) return sampleWager(wagerDistribution(s, i), rng);
     const r = fjTier1(s, i);
     if (r.lockout) return 0;
     if (r.lockTieWager != null) return r.lockTieWager;
     if (r.minWager != null) return r.minWager;
     return r.maxWager;
   });
-  for (let i = 0; i < n; i++) {
-    if (rng() < fjConfidence) s[i] += wagers[i]; else s[i] -= wagers[i];
-  }
-  const self = s[playerIndex];
-  const others = s.filter((_, i) => i !== playerIndex);
-  return others.length === 0 ? true : self >= Math.max(...others);
+  const ps = s.map((_, i) => i === playerIndex ? fjConfidence : BEHAVIOR.fjAccuracyAverage);
+  const correct = sampleCorrect(ps, latentCorrelation(BEHAVIOR.fjOutcomeCorrelation), rng);
+  for (let i = 0; i < n; i++) s[i] += correct[i] ? wagers[i] : -wagers[i];
+  return winShare(s, playerIndex);
 }
 
 function standardError(p, trials) {
@@ -663,7 +809,7 @@ function standardError(p, trials) {
 }
 
 // Standard error of the mean paired difference between two candidate wagers
-// evaluated on common random numbers. winsA/winsB are per-trial 0/1 arrays.
+// evaluated on common random numbers. winsA/winsB are per-trial win shares (0, 1/k or 1).
 function pairedStandardError(winsA, winsB) {
   const n = winsA.length;
   if (n < 2) return 0;
@@ -717,7 +863,7 @@ function bonferroniZ(numCandidates, alpha) {
 // multiplicity-adjusted Bonferroni value z* = Phi^{-1}(1 - alpha/k). See
 // RISK_REGISTER.md risk #9 and #10, and the v2 statistical review.
 function ddAnalyze(scores, playerIndex, round, pCorrect, remainingClueValues, remainingDDCount, trials = 3000, zScore = null, alpha = 0.05) {
-  const fjConfidence = 0.5, regularSuccessRate = 0.6, futureDDFraction = 0.5, futureDDSuccessRate = 0.6;
+  const fjConfidence = BEHAVIOR.fjAccuracyAverage, regularSuccessRate = 0.6, futureDDFraction = 0.5, futureDDSuccessRate = BEHAVIOR.ddAccuracyAverage;
   const maxWager = legalMaxDDWager(scores[playerIndex], round);
   const step = Math.max(1, Math.round(maxWager / 24) || 1);
   const candidateSet = new Set();
@@ -738,7 +884,7 @@ function ddAnalyze(scores, playerIndex, round, pCorrect, remainingClueValues, re
       const correct = rng() < pCorrect;
       const trialScores = scores.slice();
       trialScores[playerIndex] += correct ? w : -w;
-      winVectors[w][t] = simulateRestOfGame(trialScores, playerIndex, remainingClueValues, remainingDDCount, fjConfidence, regularSuccessRate, futureDDFraction, futureDDSuccessRate, rng) ? 1 : 0;
+      winVectors[w][t] = simulateRestOfGame(trialScores, playerIndex, remainingClueValues, remainingDDCount, fjConfidence, regularSuccessRate, futureDDFraction, futureDDSuccessRate, rng);
     }
   }
 
@@ -971,7 +1117,7 @@ function runDDAnalysis() {
     `At ${Math.round(confidence * 100)}% confidence, this wager gives an estimated ${Math.round(rec.winProbability * 100)}% simulated win rate from here.`,
     `Legal max wager here is ${money(legalMaxDDWager(self, round))} (the bigger of your score or the round cap).`,
     `Win probabilities are Monte Carlo estimates (${rec.trials} simulated trials per candidate wager) — small differences between nearby wagers can be simulation noise, not a real edge; that's what the shaded plateau band is showing.`,
-    `This estimate uses simplified placeholder assumptions for the rest of the game (see the "How This Works" tab) — treat it as a guide, not gospel.`
+    `Rivals play as simulated contestants, and a tie for first counts as half a win (tiebreaker rule). The rest of the board is a simplified model (see the "How This Works" tab) — treat it as a guide, not gospel.`
   ];
   document.getElementById('dd-notes').innerHTML = notes.map(n => `<li>${n}</li>`).join('');
 
@@ -1005,16 +1151,16 @@ function runFJAnalysis() {
 
   document.getElementById('fj-tier2-amount').textContent = money(t2.recommendedWager);
   document.getElementById('fj-tier2-explain').textContent =
-    `Using your ${Math.round(confidence * 100)}% confidence and a guess at opponent behavior, this maximizes your simulated win rate: ~${Math.round(t2.winProbability * 100)}%.`;
+    `Using your ${Math.round(confidence * 100)}% confidence against simulated contestants, this maximizes your win chance: ~${Math.round(t2.winProbability * 100)}%.`;
 
   renderCurveChart('fj-bar-chart', t2.results, t2.recommendedWager, {
-    explain: "The gold dot is Smart Bet's pick. Where several wagers tie on win probability, we break the tie in favor of the smallest wager that still beats every opponent outright rather than merely tying them — a free strict win costs nothing extra here, so there's no reason to settle for a tie."
+    explain: "The gold dot is Smart Bet's pick: the wager with the highest win chance. If several wagers tie, it takes the smallest. A wager that only ties a rival scores half a win, so the curve usually steps up by the extra dollar that turns a tie into a win."
   });
 
   const notes = [
-    "Ties for first count as a win here — the show sends co-champions back for the next game.",
+    "A tie for first goes to a tiebreaker clue (rule since November 2014), so a tie counts as half a win here.",
     "Safe Bet ignores your confidence entirely; Smart Bet uses it, which is why Smart Bet can recommend less.",
-    "Smart Bet's opponent-behavior guess is a labeled placeholder, not fitted to real historical data yet."
+    "Rivals are simulated contestants based on a published study of real games; some weights are our assumptions (see How This Works)."
   ];
   document.getElementById('fj-notes').innerHTML = notes.map(n => `<li>${n}</li>`).join('');
 

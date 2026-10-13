@@ -14,55 +14,56 @@ reduced cases of the same model. Full explanation: `docs/white-paper.md`.
 - **Tier 1** (`engine/fj_wager.py`) — worst-case guarantee, no confidence
   input needed. "What wager can't hurt me if I'm right?"
 - **Tier 2** (`engine/fj_bestresponse.py` for FJ; `engine/simulate.py` +
-  `engine/dd_wager.py` for Daily Double) — confidence-weighted, uses a
-  placeholder opponent-behavior model (documented, not fitted to real data
-  yet — ADR-0002). "Given my real confidence, what maximizes my win odds?"
+  `engine/dd_wager.py` for Daily Double) — confidence-weighted, plays
+  against simulated contestants (`engine/behavior.py`, ADR-0003): role-based
+  wager mixes, 50% opponent accuracy, outcomes correlated at 0.3 across all
+  players. Some values are PUBLISHED (Tesauro et al., 2013), the rest are
+  marked ASSUMED. "Given my real confidence, what maximizes my win odds?"
 
-Ties for first place count as wins in Tier 2 (matches the actual show
-rule); Tier 1 requires an outright beat. This is *why* Tier 2 sometimes
-recommends a smaller wager than Tier 1 for the same scoreline — not a bug.
+Tie rule: since 24 Nov 2014 a tie for first goes to a tiebreaker clue.
+Tier 2 and the DD engine score a k-way tie as 1/k of a win; nobody wins at
+$0. Tier 1 requires an outright beat. Tier 2 can recommend less than Tier 1
+at low confidence (a big bet loses more when you miss) — not a bug.
 
 ## Known gotchas
 
-- **Git is stuck in this exact folder.** A lock file got wedged during an
-  earlier session because sandboxed tools couldn't delete files inside the
-  synced Projects folder. One commit exists (`5c83b5b`). To fix: delete the
-  `.git` folder here and run `git init` again — this works fine on Will's
-  real machine, the restriction was sandbox-specific.
-- **No GitHub remote is connected.** The `engineering:github` MCP connector
-  needs authorization before any push is possible.
-- **`app/index.html` is a hand-written JS port of the Python engine.** It
-  is *not* covered by the automated test suite. If you change the Python
-  engine, you must manually update the JS and re-verify it (see
-  `CONTRIBUTING.md` step 4). This is risk #8 in `RISK_REGISTER.md`.
+- **Git and GitHub work.** `origin` is
+  https://github.com/willhoop/jeopardy-wagering. The live app is at
+  https://willhoop.github.io/jeopardy-wagering/app/. CI
+  (`.github/workflows/ci.yml`) runs pytest and `tests/js_parity.js` on
+  every push and pull request.
+- **`app/index.html` is a hand-written JS port of the Python engine.** If
+  you change the Python engine, update the JS too. `node tests/js_parity.js`
+  checks the exact functions against the hand-derived values; Monte Carlo
+  output is checked for invariants only. The app's `BEHAVIOR` object
+  mirrors the configuration block in `engine/behavior.py` — change both.
+  Risk #8 in `RISK_REGISTER.md`.
 - **Never use the jwolle1 historical dataset (or anything scraped from
   J-Archive) in a shipped artifact.** Internal validation only, if at all.
   See ADR-0001.
-- **Every doc gets a PDF companion in `build/`,** generated with pandoc +
-  pdflatex. Regenerate the PDF in the same pass as any Markdown edit — see
-  the note in `CHANGELOG.md` 0.4.1 for the exact command pattern and a
-  Unicode gotcha (U+2212 minus signs break pdflatex; use plain hyphens).
+- **Every doc gets a PDF companion in `build/`.** pandoc is not installed.
+  Use `python build/md_to_pdf.py <in.md> <out.pdf>` (Python `markdown` +
+  WeasyPrint; falls back to headless Edge/Chrome when WeasyPrint's GTK
+  libraries are missing, as on this Windows machine). Regenerate the PDF in
+  the same pass as any Markdown edit.
 
 ## Commands
 
 ```bash
 # Run tests
-cd tests && python3 -m pytest -v
+cd tests && python -m pytest -v
+# JS/Python parity
+node tests/js_parity.js
 
-# Rebuild a doc's PDF (adjust paths/title)
-pandoc docs/white-paper.md -o build/white-paper.pdf \
-  --toc --toc-depth=2 -V geometry:margin=1in -V colorlinks=true -V linkcolor=blue \
-  --highlight-style=tango --pdf-engine=pdflatex \
-  --pdf-engine-opt=-interaction=nonstopmode --pdf-engine-opt=-halt-on-error \
-  -V title="Doc Title"
+# Rebuild a doc's PDF
+python build/md_to_pdf.py docs/white-paper.md build/white-paper.pdf
 ```
 
 ## Where things stand (see CHANGELOG.md for the authoritative, dated version)
 
-Done: Tier 1 + Tier 2 FJ engines, Daily Double Monte Carlo engine, 26
-tests, the interactive app, the white paper, both ADRs, the risk register,
-PDF companions for all docs, README/LICENSE/SECURITY/CONTRIBUTING/this
-file.
-
-Not done: the plain-English deck, the Tutorial/How-to/Reference Diátaxis
-docs, `check_projects.py`, working git/CI in this folder.
+Run `git log --oneline -5` and read the top `CHANGELOG.md` entry for the
+current version and state. As of 2.0.0 (2026-10-13): Tier 1 + Tier 2 FJ
+engines, the Daily Double Monte Carlo engine, simulated contestant
+behavior with the tiebreaker rule, the interactive app (live), the white
+paper, the deck, the Diátaxis docs, ADRs 0001-0003, the risk register,
+PDF companions, CI, and `llms.txt`.

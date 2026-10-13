@@ -1,21 +1,22 @@
 # Tutorial: Get Your First Wager Recommendations
 
-This tutorial shows you how to use the Jeopardy! Wager Trainer for the first
-time. You will enter one Final Jeopardy scenario and one Daily Double
-scenario. You will see the exact numbers the tool gives back, so you can
-check your results against this page.
+This tutorial shows you how to use the Jeopardy! Wager Trainer for the
+first time. You enter one Final Jeopardy scenario and one Daily Double
+scenario. Each step gives the wager that the app shows, so you can check
+your screen against this page.
 
 ## What you need
 
 - A web browser.
-- The file `app/index.html` from this project.
+- The live app at <https://willhoop.github.io/jeopardy-wagering/app/>, or
+  the file `app/index.html` from this project.
 
-You do not need internet access. You do not need to install anything.
+The local file needs no internet access and no installation.
 
 ## Step 1: Open the app
 
-Open `app/index.html` in your browser. Double-click the file, or drag it
-into a browser window.
+Open the live app. Or double-click `app/index.html`, or drag it into a
+browser window.
 
 You see four tabs at the top: **Daily Double**, **Final Jeopardy**,
 **Quiz Me**, and **How This Works**.
@@ -23,74 +24,80 @@ You see four tabs at the top: **Daily Double**, **Final Jeopardy**,
 ## Step 2: Enter a Final Jeopardy scenario
 
 1. Click the **Final Jeopardy** tab.
-2. Set the number of players to **3**.
+2. Under "How many players?", click **3 players**.
 3. Enter these scores:
    - Your score: **12000**
-   - Rival 1: **8000**
-   - Rival 2: **6000**
+   - Opponent A score: **8000**
+   - Opponent B score: **6000**
 4. Set the confidence slider to **50%**.
-5. Click **Crunch the Numbers**.
+5. Click **Get my wagers**.
 
 ## Step 3: Read the results
 
 The app shows two cards.
 
-**Safe Bet (Tier 1)** shows **$4,001**. This is the smallest wager that beats
-every rival outright, no matter how confident you are. The app picks $4,001
-because Rival 1's worst case is $16,000 (their $8,000 doubled), and $12,000 +
-$4,001 = $16,001 — one dollar more than that worst case.
+**Safe Bet (Tier 1)** shows **$4,001**. This is the smallest wager that
+beats each opponent outright if you answer correctly. Opponent A can
+reach $16,000 ($8,000 doubled). $12,000 + $4,001 = $16,001, one dollar
+more than that worst case.
 
-**Smart Bet (Tier 2)** shows **$4,000** at 50% confidence, with a win
-probability near **78%**. Smart Bet uses your confidence. It found that
-$4,000 already reaches the same win probability as $4,001, so it recommends
-the cheaper wager.
+**Smart Bet (Tier 2)** also shows **$4,001**. Smart Bet uses your
+confidence and plays you against simulated contestants. A wager of
+$4,000 only ties Opponent A if they double up. A tie goes to a tiebreaker clue,
+so it is worth about half a win. The extra dollar turns that tie into a
+win, so Smart Bet takes it.
 
-Move the confidence slider to **90%** and click **Crunch the Numbers**
-again. Smart Bet still recommends $4,000, but the win probability rises to
-about **96%**. Higher confidence does not change *how much* to bet here — it
-changes how good that bet actually is.
+The Smart Bet card also shows a win chance. The chart under the cards
+shows the win chance for each wager. For the meaning of these
+percentages, read the Tier 2 section of `docs/white-paper.md`.
+
+Move the confidence slider to **90%**. Click **Get my wagers** again.
+Smart Bet still shows **$4,001**, but the win chance goes up. Here, higher
+confidence does not change the wager. It changes how good that wager is.
 
 ## Step 4: Enter a Daily Double scenario
 
 1. Click the **Daily Double** tab.
-2. Set the round to **Double Jeopardy**.
-3. Set the number of rivals to **2**.
+2. Under "Round", click **Double Jeopardy**.
+3. Under "How many rivals are in the game?", click **2 rivals**.
 4. Enter these scores:
    - Your score: **4000**
-   - Rival 1: **6000**
-   - Rival 2: **3000**
-5. Set "Daily Doubles still hidden after this one" to **None — this is the
-   last one**.
-6. Set "Money still in play" to **$0** (Exact amount).
+   - Rival 1 score: **6000**
+   - Rival 2 score: **3000**
+5. Set "Daily Doubles still hidden after this one" to **None — this is
+   the last one**.
+6. Set "Money still in play on the board" to **Exact amount…** and type
+   **0**.
 7. Set the confidence slider to **70%**.
-8. Click **Crunch the Numbers**.
+8. Click **Crunch the numbers**.
 
-## Step 5: Read the plateau
+## Step 5: Read the Daily Double result
 
-The app recommends a wager near **$2,000**, with a win probability near
-**45%**. Below the recommendation, you see a curve and a gold shaded band.
+The app recommends **$4,000**. This is your full score and the legal
+maximum here. Below the recommendation, you see a curve of win chance
+against wager.
 
-The shaded band is the **plateau**. Every wager inside it gives a
-statistically similar win chance. The app recommends the smallest wager in
-the band, because betting more inside the band buys you nothing extra that
-the simulation can detect.
-
-This is expected behavior, not an error. A wide plateau means the decision
-is genuinely close between several wager sizes.
+In this scenario, no other wager is close to the best one, so the chart
+shows no shaded band. In other scenarios, the chart shows a gold shaded
+band. This band is the **plateau**: the simulation cannot separate the
+wagers inside it. The app then recommends the smallest wager in the band,
+because a larger wager in the band buys nothing that the simulation can
+detect. A wide band is expected behavior, not an error.
 
 ## What you learned
 
-- Safe Bet (Tier 1) never needs a confidence number. It guarantees a win if
-  you are correct, against the worst realistic rival outcome.
-- Smart Bet (Tier 2) and the Daily Double engine use your confidence to
-  find the wager with the best real win chance.
-- The Daily Double engine runs a simulation. Its answers come with a
-  plateau, not one falsely exact number.
+- Safe Bet (Tier 1) needs no confidence number. It guarantees a win if
+  you answer correctly, against the worst case of each rival.
+- Smart Bet (Tier 2) and the Daily Double engine use your confidence and
+  simulated contestants to find the wager with the best win chance.
+- A tie for first is worth about half a win, because a tiebreaker clue
+  decides it.
+- The Daily Double engine runs a simulation. When several wagers are too
+  close to separate, it shows a plateau and recommends the smallest one.
 
 ## Next steps
 
-- Try the **Quiz Me** tab: see
-  `docs/how-to/practice-with-quiz-mode.md`.
+- Try the **Quiz Me** tab: see `docs/how-to/practice-with-quiz-mode.md`.
 - Enter your own game's scores: see
   `docs/how-to/get-a-wager-recommendation.md`.
-- Read the full math behind these numbers: `docs/white-paper.md`.
+- Read the math and the results: `docs/white-paper.md`.

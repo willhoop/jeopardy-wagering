@@ -6,9 +6,11 @@ consistent if that changes.
 ## Before making a change
 
 Read `docs/white-paper.md` first. It explains the math this project is
-built on and which parts are validated versus placeholders. Changes to the
+built on and which parts are published versus assumed. Changes to the
 engine should either preserve the existing guarantees (Tier 1) or be
 explicit about which assumptions they're changing (Tier 2 / Daily Double).
+Every opponent-behavior value lives in the configuration block of
+`engine/behavior.py`, marked PUBLISHED or ASSUMED (ADR-0003).
 
 ## Making a change
 
@@ -20,18 +22,20 @@ explicit about which assumptions they're changing (Tier 2 / Daily Double).
    paper, not copied from the code's own output) wherever the math allows
    it. Where that's not possible (the Monte Carlo Daily Double engine), add
    invariant checks instead -- see `tests/test_dd_wager.py` for examples.
-4. If `app/index.html`'s JavaScript logic is touched, re-run the parity
-   check against the Python test suite's hand-derived values before
-   shipping (there's no automated check for this yet -- see risk #8 in
-   `RISK_REGISTER.md`).
+4. If you change the engine or `app/index.html`'s JavaScript, keep them in
+   step (including the app's `BEHAVIOR` object, which mirrors
+   `engine/behavior.py`) and run `node tests/js_parity.js`. CI runs it on
+   every push and pull request -- see risk #8 in `RISK_REGISTER.md`.
 5. Add a `CHANGELOG.md` entry: what changed, and why, following [Keep a
-   Changelog](https://keepachangelog.com/) format. Bump the version.
-6. Regenerate any PDF in `build/` whose Markdown source changed.
+   Changelog](https://keepachangelog.com/) format, with a `### Record`
+   section. Bump the version.
+6. Regenerate any PDF in `build/` whose Markdown source changed:
+   `python build/md_to_pdf.py <source.md> build/<name>.pdf`.
 7. Run the test suite:
 
    ```bash
    cd tests
-   python3 -m pytest -v
+   python -m pytest -v
    ```
 
 ## Never do this
@@ -42,5 +46,5 @@ explicit about which assumptions they're changing (Tier 2 / Daily Double).
   Add new information and state what changed and why, so the history stays
   legible.
 - Never present a Tier 2 / Daily Double win-probability number as a
-  validated statistic without noting the placeholder opponent-model
-  assumptions behind it.
+  validated statistic. It is a model output that rests on the assumed
+  values in `engine/behavior.py` (see ADR-0003).

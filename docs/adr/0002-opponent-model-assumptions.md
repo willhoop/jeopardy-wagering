@@ -1,6 +1,6 @@
 # ADR-0002: Opponent-model assumptions in the Tier 2 / Monte Carlo engines
 
-Status: accepted (as a documented placeholder, not a final calibration)
+Status: superseded by ADR-0003 (2026-10-13)
 Date: 2026-07-23
 
 ## Context
