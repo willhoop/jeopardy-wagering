@@ -236,6 +236,15 @@ def analyze(
     # statistically-justified amount.
     recommended_wager = min(plateau)
 
+    # Exact ties: wagers with the same outcome as the recommendation on
+    # EVERY trial (for example, a solo game, which is always won). They
+    # cannot differ in win chance, so pick by money: the Daily Double itself
+    # adds (2p - 1) * wager on average, so bet the most when p > 0.5.
+    rec_vector = win_indicators[recommended_wager]
+    exact = [w for w in candidate_wagers if win_indicators[w] == rec_vector]
+    if p_correct > 0.5:
+        recommended_wager = max(exact)
+
     notes = [
         f"Win probabilities are Monte Carlo estimates ({trials_per_wager} trials "
         "per candidate wager, evaluated on common random numbers so wagers can "

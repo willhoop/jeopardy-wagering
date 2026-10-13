@@ -48,12 +48,12 @@ check('FJ correlated cover 0.825', approx(expectedWinProbability(9000, 1001, 0.5
 {
   const orig = defaultOpponentDist;
   defaultOpponentDist = () => OPP;
-  check('FJ recommends cover 1001, not tie 1000', fjTier2([9000, 5000], 0, 0.5, 0.5, 0).recommendedWager === 1001);
+  check('FJ recommends 3999: top of the tied range, by money', fjTier2([9000, 5000], 0, 0.5, 0.5, 0).recommendedWager === 3999);
   const dists = { 1: [[0, 0.5], [9000, 0.5]], 2: [[0, 1 / 3], [8001, 1 / 3], [10000, 1 / 3]] };
   defaultOpponentDist = (s, i) => dists[i];
   const rec = fjTier2([4000, 9000, 10000], 0, 1.0, 0.5, 0);
   check('3-way both-leaders-bust win prob 1/12', approx(rec.winProbability, 1 / 12));
-  check('3-way recommends 0', rec.recommendedWager === 0);
+  check('3-way recommends 4000 (tied win share, most money)', rec.recommendedWager === 4000);
   defaultOpponentDist = orig;
 }
 
@@ -77,6 +77,8 @@ check('winShare nobody wins at $0', winShare([0, 0, 0], 0) === 0);
   const both = quadratureNodes().reduce((acc, [f, w]) => acc + w * conditionalAccuracy(0.5, f, r) ** 2, 0);
   check('quadrature reproduces binary correlation 0.3', approx(both, 0.325, 1e-4));
 }
+check('solo at 100% bets everything', fjTier2([12000], 0, 1.0).recommendedWager === 12000);
+check('solo DD at 70% bets the max', ddAnalyze([5000], 0, 2, 0.7, [], 0, 50).recommendedWager === 5000);
 check('shipped defaults: leader at 89% does not bet the tie', fjTier2([10000, 8000, 3400], 0, 0.89).recommendedWager !== 6000);
 
 // --- Inverse-normal / Bonferroni band reference values (must match Python) ---

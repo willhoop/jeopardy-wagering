@@ -1,8 +1,8 @@
 # The House Is You: Why Strong Players Underwager on Jeopardy!
 
-Version 2.1 — 2026-10-13. A thesis: an argument with its evidence, its
+Version 2.2 — 2026-10-13. A thesis: an argument with its evidence, its
 counter-evidence and the tests it still needs. Model figures come from this
-project's engine at version 2.1.0; the white paper documents that engine.
+project's engine at version 2.2.0; the white paper documents that engine.
 
 ## Abstract
 
@@ -152,7 +152,9 @@ $8,000 vs $6,000):
 | 70% | 58.0% | **85.8%** |
 
 A leader who "plays it safe" by betting nothing gives up 28 to 38 points of
-win probability. The cover bet is the safe bet.
+win probability. The cover bet is the safe bet. The engine itself now
+recommends $4,499 at both confidence levels: the same win probability as
+$4,001, with more money when right, because a miss still leaves $7,501.
 
 Commands: see section 9.
 
@@ -220,7 +222,7 @@ correct in several places:
 4. **Masters.** Rebuild the objective as expected match points, then judge
    Masters wagers against that objective, not against win probability.
 
-Reproduce section 5 (from `engine/`, version 2.1.0):
+Reproduce section 5 (from `engine/`, version 2.2.0):
 
 ```python
 import dd_wager, fj_bestresponse as br
@@ -229,7 +231,9 @@ cfg = RolloutConfig(remaining_clue_values=[1100] * 7, remaining_dd_count=0)
 r = dd_wager.analyze([6000, 12000, 8000], 0, 2, 0.7, config=cfg,
                      wager_step=200, trials_per_wager=2000, seed=7)
 print(r.recommended_wager, dict(r.wager_win_probabilities)[6000])
-print(br.analyze([12000, 8000, 6000], 0, 0.9).win_probability)
+r = br.analyze([12000, 8000, 6000], 0, 0.9)
+print(r.recommended_wager, r.win_probability, dict(r.wager_win_probabilities)[0])
+print(br.analyze([12000, 8000, 6000], 1, 0.7).recommended_wager)
 ```
 
 ## References

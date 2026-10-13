@@ -234,12 +234,29 @@ The candidate wagers are every multiple of `wager_step` from $0 to the
 legal maximum, plus the legal maximum, the Tier 1 cover wager, the cover
 wager minus $1, and the Tier 1 lock-tie wager, when these exist.
 
+The candidates also include every breakpoint. For own score `S` and each
+final score `f` that an opponent can reach, the breakpoints are `f - S`,
+`f - S + 1`, `S - f` and `S - f - 1`. The win share changes only at these
+wagers. Thus the engine tries the best wager in each flat stretch exactly.
+The engine keeps only candidates from $0 to the legal maximum.
+
+**Choice rule: win share first, money second.**
+
+1. Find the highest expected win share.
+2. Keep each candidate whose win share is within 1e-9 of it.
+3. From these, choose the candidate with the highest expected winnings,
+   rounded to 6 decimal places. Expected winnings are the final score
+   times the win share, summed over all outcomes. The winner keeps their
+   final total.
+4. If two candidates have equal expected winnings, choose the smaller
+   wager.
+
 **Returns:** an `FJBestResponse` with these fields:
 
 | Field | Type | Meaning |
 |---|---|---|
 | `player_index` | int | The analyzed player. |
-| `recommended_wager` | int | The wager with the highest expected win share. If two or more wagers are within 1e-9 of the best, the smallest wager is chosen. |
+| `recommended_wager` | int | The wager with the highest expected win share. If two or more wagers are within 1e-9 of the best, the wager with the highest expected winnings is chosen, then the smallest (see "Choice rule"). |
 | `win_probability` | float | The expected win share at the recommended wager. A tie scores 1/k (see "Scoring rule"). |
 | `wager_win_probabilities` | list of (int, float) | Each candidate wager, with its expected win share. |
 | `tier1_cover_wager` | int or None | The Tier 1 guarantee wager, for comparison. |
@@ -323,7 +340,7 @@ and the round cap ($1,000 in Single Jeopardy, $2,000 in Double Jeopardy).
 Runs a Monte Carlo simulation of the rest of the game for each candidate
 wager. All candidates use the same random numbers in each trial (common
 random numbers). Returns the smallest wager that the simulation cannot
-separate from the best one.
+separate from the best one, except for exact ties (see `recommended_wager`).
 
 **Parameters:**
 
@@ -348,7 +365,7 @@ separate from the best one.
 | `player_score` | int | The score of the analyzed player. |
 | `round_number` | int | The round. |
 | `p_correct` | float | The confidence used. |
-| `recommended_wager` | int | The smallest wager on the plateau. |
+| `recommended_wager` | int | The smallest wager on the plateau. Exception: if `p_correct > 0.5`, the largest wager whose per-trial win share equals that of the smallest plateau wager on every trial (an exact tie, for example in a solo game). |
 | `win_probability` | float | The mean win share at the best candidate. This is the in-sample maximum, so it is slightly optimistic (RISK_REGISTER.md risk #11). |
 | `wager_win_probabilities` | list of (int, float) | Each candidate wager, with its mean win share. |
 | `standard_errors` | list of (int, float) | Each candidate's standard error, `sqrt(p(1-p)/trials)`. |

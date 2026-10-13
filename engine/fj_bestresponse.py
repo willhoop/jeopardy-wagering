@@ -103,13 +103,24 @@ def _share(self_final: int, top, count: int) -> float:
     return 0.0
 
 
-def _expected_share(self_score: int, wager: int, table) -> float:
-    total = 0.0
+def _expected_outcome(self_score: int, wager: int, table) -> Tuple[float, float]:
+    """(expected win share, expected winnings) for one wager.
+
+    Winnings are the final score times the win share: the winner keeps
+    their total, everyone else keeps nothing of it.
+    """
+    share = money = 0.0
     up, down = self_score + wager, self_score - wager
     for weight, ps, tops in table:
         for (top, count), p in tops.items():
-            total += weight * p * (ps * _share(up, top, count) + (1 - ps) * _share(down, top, count))
-    return total
+            s_up, s_down = _share(up, top, count), _share(down, top, count)
+            share += weight * p * (ps * s_up + (1 - ps) * s_down)
+            money += weight * p * (ps * s_up * up + (1 - ps) * s_down * down)
+    return share, money
+
+
+def _expected_share(self_score: int, wager: int, table) -> float:
+    return _expected_outcome(self_score, wager, table)[0]
 
 
 def expected_win_probability(
@@ -168,14 +179,28 @@ def analyze(
         candidate_wagers.add(tier1.min_wager_to_guarantee_win - 1)
     if tier1.lock_tie_wager is not None:
         candidate_wagers.add(tier1.lock_tie_wager)
+    # Breakpoints: the wagers that just pass, tie, or just stay above each
+    # possible opponent final score. Win share only changes at these
+    # points, so the best wager in each flat stretch is always tried.
+    for opp in opponents:
+        for wager, _p in opp.wager_dist:
+            for final in (opp.score + wager, opp.score - wager):
+                for w in (final - self_score, final - self_score + 1,
+                          self_score - final, self_score - final - 1):
+                    candidate_wagers.add(w)
     candidate_wagers = sorted(w for w in candidate_wagers if 0 <= w <= max_wager)
 
     table = _opponent_table(opponents, p_self_correct, correlation)
-    results = [(w, _expected_share(self_score, w, table)) for w in candidate_wagers]
+    outcomes = {w: _expected_outcome(self_score, w, table) for w in candidate_wagers}
+    results = [(w, outcomes[w][0]) for w in candidate_wagers]
 
     best_prob = max(p for _, p in results)
-    # Among wagers within rounding of the best, take the smallest.
-    best_wager = min(w for w, p in results if p >= best_prob - 1e-9)
+    # Win chance first, money second. Among wagers that tie on win share
+    # (within rounding), take the one with the highest expected winnings,
+    # then the smallest. A solo player, or a leader in a lockout, wins
+    # whatever they bet, so only the money can separate the wagers.
+    tied = [w for w, p in results if p >= best_prob - 1e-9]
+    best_wager = max(tied, key=lambda w: (round(outcomes[w][1], 6), -w))
 
     notes = [
         "Ties for first go to a tiebreaker clue (rule since November 2014), "

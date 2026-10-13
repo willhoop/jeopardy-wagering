@@ -1,7 +1,9 @@
 # Jeopardy! Wagering Strategy: A Practical Model for Daily Double and Final Jeopardy Bets
 
-Version 2.1.1 — 2026-10-13 (2.1.1 adds only a thesis link in llms.txt. Version 2.1 recalibrates the simulated rivals to
-modern-era play; figures change, the question does not.)
+Version 2.2 — 2026-10-13 (Tier 2 now breaks ties in win share by expected
+winnings instead of taking the smallest wager, so some recommended wagers
+move and no win share does. Version 2.1 recalibrates the simulated rivals to
+modern-era play.)
 
 ## Abstract
 
@@ -36,6 +38,17 @@ section 3). Final Jeopardy accuracy now depends on score rank, and a future
 Daily Double now falls at a random point among the remaining clues instead
 of after all of them. Every 2.0 Tier 2 and Daily Double figure is replaced
 by a rerun of the 2.1 engine. The question each figure answers is the same.
+
+**Change in 2.2.** A user reported that a solo game ("Just you") at 100%
+confidence got a Smart Bet of \$0. A solo player wins whatever they bet, so
+every wager tied on win share, and the 2.1 tiebreak, the smallest wager,
+chose \$0. Tier 2 now ranks wagers by win share first and money second:
+among wagers tied on win share, it takes the one with the highest expected
+winnings, then the smallest (section 5.2). It also tries every breakpoint
+wager, so Python and the app give identical recommendations. The Daily
+Double engine applies the money rule to exact ties only (section 6.4). No
+win share moves. Recommended wagers inside a tied range do: the featured
+case moves from \$6,001 to \$6,599 at the same 91.3% (section 5.4).
 
 ## 1. Motivation and scope
 
@@ -320,9 +333,21 @@ explicit input), the quadrature result differs from the exact value by
 1.4e-10.
 
 **Search.** The engine evaluates every \$100 from \$0 to the legal maximum,
-plus the legal maximum, the Tier 1 cover wager and one dollar below it, and
-the Tier 1 lock-tie wager. It recommends the smallest wager whose win share
-is within 1e-9 of the best.
+plus the legal maximum, the Tier 1 cover wager and one dollar below it, the
+Tier 1 lock-tie wager, and every breakpoint. For own score `S` and each
+possible opponent final score `f`, the breakpoints are `f - S`, `f - S + 1`,
+`S - f` and `S - f - 1`: the wagers that tie or just pass `f` when right, and
+that tie or just stay above `f` when wrong. Win share changes only at these
+points, so the best wager in each flat stretch is always tried.
+
+**Choice: win share first, money second.** Among wagers whose win share is
+within 1e-9 of the best, the engine recommends the one with the highest
+expected winnings, then the smallest. Expected winnings are the final score
+times the win share, `E[share(S ± w) × (S ± w)]`, because the winner keeps
+their total; they are compared to six decimal places. A solo player, or a
+leader in a lockout, wins whatever they bet, so only the money separates the
+wagers. Before 2.2 the engine took the smallest tied wager, which told a solo
+player at 100% confidence to bet \$0.
 
 Version 1.x also had a "strict win" secondary objective, added to stop the
 engine preferring a tie bet over a cover bet. It is removed in 2.0. Under the
@@ -385,9 +410,18 @@ finishes at \$5,000 (0.5), \$10,000 (0.25) or \$0 (0.25).
 - Cover bet, \$1,001. Right: \$10,001 beats every outcome, so 1. Wrong:
   \$7,999, so 0.75. Win share = 0.5 × 1 + 0.5 × 0.75 = **0.875**.
 
-The extra dollar is worth 6.25 points of win share. Tier 2 recommends
-\$1,001, the same as Tier 1. Under the 1.x rule both bets scored 0.875;
-that equality was the root of the defect. This case is
+The extra dollar is worth 6.25 points of win share. Under the 1.x rule both
+bets scored 0.875; that equality was the root of the defect.
+
+The cover bet is not the only wager worth 0.875. Every wager `w` from
+\$1,001 to \$3,999 wins when right (9,000 + w is above \$10,000) and, when
+wrong, lands on \$5,001 to \$7,999: above \$5,000 and \$0, below \$10,000,
+so 0.75. At \$4,000 a wrong answer ties \$5,000 and the win share falls to
+0.75. Within the tied range, expected winnings are
+0.5 × (9,000 + w) + 0.375 × (9,000 - w), which rise by \$0.125 for each
+dollar of wager. Tier 2 therefore recommends **\$3,999**; 2.1 recommended
+\$1,001, the smallest tied wager. Tier 1 says \$1,001. The tie bet,
+\$1,000, is still worth only 0.8125. This case is
 `test_tie_bet_is_worth_less_than_cover_bet` in
 `tests/test_fj_bestresponse.py`.
 
@@ -399,16 +433,30 @@ opponents, accuracy by score rank, calibrated correlation).
 |---|---|
 | \$0 | 69.7% |
 | \$6,000 (ties B if both double) | 84.9% |
-| **\$6,001 (Tier 1 cover, recommended)** | **91.3%** (0.912976) |
+| \$6,001 (Tier 1 cover) | 91.3% (0.912976) |
+| **\$6,599 (recommended)** | **91.3%** (0.912976) |
+| \$6,600 | 91.0% |
 | \$10,000 (all-in) | 89.0% |
 
-Tier 1 says \$6,001. Tier 2 also says **\$6,001**; the 1.x engine said
-\$6,000. The JavaScript app gives the same \$6,001 and 91.3%. With the
-correlation set to 0, Tier 2 still recommends \$6,001, at 90.4%. The same
-scores at 50% confidence give a different answer: Tier 2 recommends \$100,
-at 74.0% (the \$6,001 cover is worth 58.6%). A small bet clears the \$10,000
-ties that some simulated B wagers produce, for example B betting \$2,000 and
-answering right, without risking much on a coin-flip clue.
+Tier 1 says \$6,001. The 1.x engine said \$6,000, a bet that only ties B;
+2.0 and 2.1 said \$6,001. In 2.2, Tier 2 recommends **\$6,599**. Every wager
+from \$6,001 to \$6,599 has the same win share, 0.912976: each one covers
+B's doubled \$16,000, and a miss still leaves at least \$3,401, above C's
+\$3,400. At \$6,600 a miss leaves \$3,400, which can tie C, and the share
+drops to 91.0%. Within the tied range a larger wager wins more money when
+right, so the money tiebreak picks the top of the range. The JavaScript app
+gives the same \$6,599 and 91.3%. With the correlation set to 0, Tier 2
+also recommends \$6,599, at 90.4%.
+
+The same scores at 50% confidence give a different answer: Tier 2 recommends
+\$2, at 74.0% (the \$6,001 cover is worth 58.6%). A \$2 bet that is right
+reaches \$10,002, which clears the \$10,000 and \$10,001 finishes that some
+simulated B wagers produce (B betting \$2,000, or the \$2,001 overtake bet,
+and answering right), without risking much on a coin-flip clue. Every tried
+wager from \$2 to \$800 scores 74.0%. Here expected winnings fall slightly
+as the wager grows (\$7,396.99 at \$2, \$7,396.30 at \$800), so the
+smallest tied wager is also the money choice. The 2.1 engine said \$100,
+because its \$100 grid did not try \$2.
 
 **The lock-tie against simulated opponents.** B at \$5,000 against A at
 \$10,000 and C at \$1,000 (section 4.3). Tier 2 also recommends the
@@ -505,7 +553,15 @@ Bonferroni value `z* = Phi^{-1}(1 - alpha/k)` with `alpha = 0.05`. A wager
 is on the plateau if `p_best - p_w <= z* × SE_paired(w)`. The recommendation
 is the smallest wager on the plateau.
 
-Current results (Monte Carlo estimates; 2.1 engine, rerun 2026-10-13):
+**Exact ties (2.2).** Some wagers have the same outcome as the
+recommendation on every simulated trial; a solo game, which is always won,
+is the plain case. No amount of simulation can separate them on win share,
+so the engine picks by money: the Daily Double adds (2p - 1) × wager on
+average, so when p > 0.5 it recommends the largest such wager. Otherwise the
+plateau rule is unchanged.
+
+Current results (Monte Carlo estimates; 2.2 engine, rerun 2026-10-13; every
+figure is the same as under 2.1):
 
 | Scenario | Trials per wager, seed | Recommended | Best estimate |
 |---|---|---|---|
@@ -538,19 +594,23 @@ of this writing.
 
 ## 7. Validation
 
-**Method.** 46 automated Python tests (`cd tests && python -m pytest -q`,
-46 passed on 2026-10-13): 9 for Tier 1, 9 for Tier 2, 11 for the behavior
-model, 11 for the Daily Double engine, 6 for the rollout simulator. A
-separate harness, `node tests/js_parity.js`, runs 25 checks against the
-JavaScript port in `app/index.html` (25 passed on 2026-10-13). CI runs both on
+**Method.** 49 automated Python tests (`cd tests && python -m pytest -q`,
+49 passed on 2026-10-13): 9 for Tier 1, 11 for Tier 2, 11 for the behavior
+model, 12 for the Daily Double engine, 6 for the rollout simulator. A
+separate harness, `node tests/js_parity.js`, runs 27 checks against the
+JavaScript port in `app/index.html` (27 passed on 2026-10-13). CI runs both on
 every push and pull request.
 
 - **Exact parts (Tier 1, Tier 2, scoring, behavior).** Expected values are
   derived by hand and written in the test comments, not captured from the
   code's output. Examples: the tie bet 0.8125 vs cover bet 0.875 (section
-  5.4); a two-way tie worth 1/2 and a three-way tie 1/3; nobody wins at \$0;
+  5.4), with the money tiebreak choosing \$3,999 inside the tied range; a
+  two-way tie worth 1/2 and a three-way tie 1/3; nobody wins at \$0;
   a third-place player at 100% confidence against two leaders with fixed
-  wager distributions wins exactly 1/12 (only when both leaders bust); the
+  wager distributions wins exactly 1/12 (only when both leaders bust) and
+  bets all \$4,000, because every wager ties on win share; a solo player
+  bets everything at 100% confidence and \$0 at 30%; a locked-out leader
+  who is sure bets everything; the
   published B weights reproduced in their regime; opponent accuracy that
   follows score rank; the frequency with which each rank finds a future
   Daily Double; the future-DD wager fraction by round; and a correlated case
@@ -569,7 +629,8 @@ every push and pull request.
   determinism under a fixed seed; probabilities in [0, 1]; paired standard
   error never above the independent formula; the Bonferroni band widens
   with more candidates; a clear-signal case recommends a positive wager,
-  identical across seeds 1, 2 and 3.
+  identical across seeds 1, 2 and 3; among exactly tied wagers, a solo
+  player who is likely right bets the most.
 - **JavaScript parity.** The exact Tier 2 values, win-share rule, behavior
   weights, correlation check, shipped-default regression and statistical
   reference values match Python. Python and JS use different random number
@@ -623,7 +684,9 @@ In order of how much they matter:
 10. **Earlier figures are not comparable or are superseded.** Any win
     percentage from a version before 2.0 scored ties as wins against a
     different opponent model. Every 2.0 Tier 2 and Daily Double figure is
-    superseded by the 2.1 recalibration.
+    superseded by the 2.1 recalibration. Tier 2 recommended wagers from 2.1
+    and earlier used the smallest-tied-wager rule; 2.2 replaces them (the
+    win shares are unchanged).
 11. **This tool is a study and post-game analysis aid, not a live-assist
     device.** Using it during an actual taping would violate the show's
     rules.
@@ -663,9 +726,10 @@ Every figure in sections 5 and 6 comes from the shipped engine, run from
 `engine/`:
 
 ```
-python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.89); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, [d[w] for w in (0, 6000, 6001, 10000)])"
+python -c "import fj_bestresponse as br; r = br.analyze([9000, 5000], 0, 0.5, opponent_model_fn=lambda s, i: [(0, 0.5), (5000, 0.5)], opponent_correctness=0.5, correlation=0.0); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, d[1000], d[1001], d[4000])"
+python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.89); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, [d[w] for w in (0, 6000, 6001, 6599, 6600, 10000)])"
 python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.89, correlation=0.0); print(r.recommended_wager, r.win_probability)"
-python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.5); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, d[6001])"
+python -c "import fj_bestresponse as br; r = br.analyze([10000, 8000, 3400], 0, 0.5); d = dict(r.wager_win_probabilities); print(r.recommended_wager, r.win_probability, d[6001], [w for w, p in r.wager_win_probabilities if p >= r.win_probability - 1e-9])"
 python -c "import behavior; print(behavior.wager_distribution([10000, 8000, 3400], 1), behavior.wager_distribution([10000, 8000, 3400], 2))"
 python -c "import fj_bestresponse as br; [print(p, br.analyze([10000, 5000, 1000], 1, p).recommended_wager, dict(br.analyze([10000, 5000, 1000], 1, p).wager_win_probabilities)[5000], dict(br.analyze([10000, 5000, 1000], 1, p).wager_win_probabilities)[0]) for p in (0.5, 0.89)]"
 python -c "import dd_wager; from simulate import RolloutConfig as C; [print(s, (r := dd_wager.analyze([3000, 4000, 2000], 0, 2, 1.0, config=C(), wager_step=300, trials_per_wager=800, seed=s)).recommended_wager, r.win_probability, r.plateau) for s in (1, 2, 3)]"

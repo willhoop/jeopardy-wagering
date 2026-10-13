@@ -68,7 +68,11 @@ def test_tie_bet_is_worth_less_than_cover_bet():
     assert abs(br.expected_win_probability(9000, 1000, 0.5, [opp]) - 0.8125) < 1e-9
     rec = br.analyze([9000, 5000], 0, 0.5, opponent_model_fn=fixed_model,
                      opponent_correctness=0.5, correlation=0.0)
-    assert rec.recommended_wager == 1001
+    # Every wager from 1001 to 3999 scores 0.875 (wrong lands on 5001..7999,
+    # still above the opponent's 5000). Money breaks the tie: expected
+    # winnings 0.5*(9000 + w) + 0.5*0.75*(9000 - w) rise with w, so the
+    # largest tied wager, 3999, wins. ($4,000 would tie 5000 when wrong.)
+    assert rec.recommended_wager == 3999
     assert abs(rec.win_probability - 0.875) < 1e-9
 
 
@@ -113,12 +117,14 @@ def test_third_place_can_win_when_both_leaders_bust():
     #      1999 (1/6), 20000 (1/6), 0 (1/6).
     # Any self wager 0..4000 lands on 4000..8000. No opponent outcome lies
     # in that range, so self wins only when both bust:
-    #   P(A = 0) = .25, P(B <= 1999) = 1/3 -> 1/12. Smallest wager: 0.
+    #   P(A = 0) = .25, P(B <= 1999) = 1/3 -> 1/12, for every wager.
+    # Tied on win share, so money decides: expected winnings are
+    # (4000 + w) / 12, highest at w = 4000.
     dists = {1: [(0, 0.5), (9000, 0.5)], 2: [(0, 1 / 3), (8001, 1 / 3), (10000, 1 / 3)]}
     rec = br.analyze([4000, 9000, 10000], 0, 1.0, opponent_model_fn=lambda s, i: dists[i],
                      opponent_correctness=0.5, correlation=0.0)
     assert abs(rec.win_probability - (1 / 12)) < 1e-9
-    assert rec.recommended_wager == 0
+    assert rec.recommended_wager == 4000
 
 
 def test_shipped_defaults_never_recommend_a_tie_only_cover():
@@ -129,3 +135,20 @@ def test_shipped_defaults_never_recommend_a_tie_only_cover():
         rec = br.analyze(scores, 0, p)
         tie_bet = 2 * scores[1] - scores[0]
         assert rec.recommended_wager != tie_bet, (scores, rec.recommended_wager)
+
+
+def test_solo_game_bets_by_money():
+    # Solo: every wager wins, so only expected winnings matter:
+    # E = 12000 + (2p - 1) * w. p = 1 -> bet all 12000; p = 0.3 -> bet 0.
+    assert br.analyze([12000], 0, 1.0).recommended_wager == 12000
+    assert br.analyze([12000], 0, 0.3).recommended_wager == 0
+
+
+def test_lockout_leader_at_full_confidence_bets_everything():
+    # Leader 20000 vs 8000 (opponent bets all, explicit model). At p = 1 the
+    # leader always ends on 20000 + w > 16000, so every wager wins; money
+    # decides: winnings 20000 + w, highest at w = 20000.
+    rec = br.analyze([20000, 8000], 0, 1.0, opponent_model_fn=lambda s, i: [(8000, 1.0)],
+                     opponent_correctness=0.5, correlation=0.0)
+    assert rec.win_probability == 1.0
+    assert rec.recommended_wager == 20000

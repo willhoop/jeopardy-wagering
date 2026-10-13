@@ -35,9 +35,9 @@ second (B), third (C).
 
 | Role | Bet types and weights | Source |
 |---|---|---|
-| B | all-in 26%, keep C out (bet < B−2C, or cover 2C−B+1) 27%, overtake A (A−B+1) 15%, two-thirds (3B−2A−1) 8%, random 24% | PUBLISHED for the regime B ≥ ¾A and B ≥ 2C (T13 §2.3). ASSUMED for the other five regimes. |
-| A, not locked | cover 2B−A+1 75%, tie-cover 2B−A 10%, all-in 5%, random 10% | ASSUMED. T13 §1.1 says A "usually" covers, "frequently" 2B−A+1, with no split. |
-| A, lockout (A > 2B) | $0 50%, largest safe bet A−2B−1 50% | ASSUMED. |
+| B | all-in 26%, keep C out (bet < B-2C, or cover 2C-B+1) 27%, overtake A (A-B+1) 15%, two-thirds (3B-2A-1) 8%, random 24% | PUBLISHED for the regime B ≥ ¾A and B ≥ 2C (T13 §2.3). ASSUMED for the other five regimes. |
+| A, not locked | cover 2B-A+1 75%, tie-cover 2B-A 10%, all-in 5%, random 10% | ASSUMED. T13 §1.1 says A "usually" covers, "frequently" 2B-A+1, with no split. |
+| A, lockout (A > 2B) | $0 50%, largest safe bet A-2B-1 50% | ASSUMED. |
 | C | random | PUBLISHED that C's bets do not depend on the game state (T13 §2.3 note 5). The flat shape is ASSUMED. |
 
 "Random" is an equal spread over 0, ¼, ½, ¾ and all of the score. When a
@@ -57,7 +57,7 @@ copula: a hard clue is hard for everyone.
 Final Jeopardy wagers are drawn from the model above.
 
 **Computation.** Tier 2 is exact: it integrates over the shared factor
-(trapezoid rule, step 0.25 on [−6, 6]) and enumerates every wager and
+(trapezoid rule, step 0.25 on [-6, 6]) and enumerates every wager and
 right/wrong branch. The DD engine samples the same model.
 
 ## Consequences

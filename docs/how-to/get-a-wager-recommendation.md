@@ -27,7 +27,10 @@ your own game. If this is your first time, read
 The app shows your recommended wager, the estimated win rate at that
 wager, and a curve chart. If the chart shows a shaded band, the
 simulation cannot separate the wagers in that band. This is expected.
-The recommendation is the smallest wager in the band.
+The recommendation is the smallest wager in the band. Exception: wagers
+that give exactly the same result in every simulated game (for example,
+in **Solo practice**) are chosen by money. If your confidence is above
+50%, the app recommends the largest of them.
 
 ## How to get a Final Jeopardy recommendation
 
@@ -47,7 +50,9 @@ The app shows two cards side by side:
   confidence and simulated contestants as opponents. With low confidence
   it can recommend less money than Safe Bet. A tie for first counts as
   half a win, because a tiebreaker clue decides it (rule since November
-  2014).
+  2014). When several wagers give the same win chance, Smart Bet picks
+  the one with the most expected money. For example, with **Just you** and
+  high confidence, it recommends that you bet everything.
 
 ## How to read the curve chart
 

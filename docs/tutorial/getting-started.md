@@ -41,18 +41,25 @@ beats each opponent outright if you answer correctly. Opponent A can
 reach $16,000 ($8,000 doubled). $12,000 + $4,001 = $16,001, one dollar
 more than that worst case.
 
-**Smart Bet (Tier 2)** also shows **$4,001**. Smart Bet uses your
+**Smart Bet (Tier 2)** shows **$4,499**. Smart Bet uses your
 confidence and plays you against simulated contestants. A wager of
-$4,000 only ties Opponent A if they double up. A tie goes to a tiebreaker clue,
-so it is worth about half a win. The extra dollar turns that tie into a
-win, so Smart Bet takes it.
+$4,000 only ties Opponent A if they double up. A tie goes to a tiebreaker
+clue, so it is worth about half a win. So Smart Bet bets at least $4,001.
+
+Every wager from $4,001 to $4,499 gives the same win chance. Each one
+beats Opponent A's $16,000 if you are right. If you are wrong, you keep at
+least $7,501. That is more than the $7,500 that Opponent B gets with a
+$1,500 bet that is right. At $4,500, a wrong answer leaves you at $7,500,
+a tie, and the win chance goes down. When wagers give the same win
+chance, Smart Bet picks the one that wins you the most money. That is
+$4,499, the top of the range.
 
 The Smart Bet card also shows a win chance. The chart under the cards
 shows the win chance for each wager. For the meaning of these
 percentages, read the Tier 2 section of `docs/white-paper.md`.
 
 Move the confidence slider to **90%**. Click **Get my wagers** again.
-Smart Bet still shows **$4,001**, but the win chance goes up. Here, higher
+Smart Bet still shows **$4,499**, but the win chance goes up. Here, higher
 confidence does not change the wager. It changes how good that wager is.
 
 ## Step 4: Enter a Daily Double scenario
@@ -82,14 +89,19 @@ shows no shaded band. In other scenarios, the chart shows a gold shaded
 band. This band is the **plateau**: the simulation cannot separate the
 wagers inside it. The app then recommends the smallest wager in the band,
 because a larger wager in the band buys nothing that the simulation can
-detect. A wide band is expected behavior, not an error.
+detect. A wide band is expected behavior, not an error. One exception:
+wagers that give exactly the same result in every simulated game (for
+example, in solo practice) are chosen by money. If you are more likely
+right than wrong, the app picks the largest of them.
 
 ## What you learned
 
 - Safe Bet (Tier 1) needs no confidence number. It guarantees a win if
   you answer correctly, against the worst case of each rival.
 - Smart Bet (Tier 2) and the Daily Double engine use your confidence and
-  simulated contestants to find the wager with the best win chance.
+  simulated contestants to find the wager with the best win chance. When
+  several wagers give the same win chance, Smart Bet picks the one that
+  wins the most money.
 - A tie for first is worth about half a win, because a tiebreaker clue
   decides it.
 - The Daily Double engine runs a simulation. When several wagers are too

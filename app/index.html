@@ -473,7 +473,7 @@
 </main>
 
 <footer>
-  Jeopardy! Wager Trainer v2.1.1 — practice tool, not affiliated with the show.<br>
+  Jeopardy! Wager Trainer v2.2.0 — practice tool, not affiliated with the show.<br>
   Built by <a href="https://willhoop.github.io/" target="_blank" rel="noopener">willhoop.github.io</a>
 </footer>
 
@@ -739,14 +739,20 @@ function shareVsTop(selfFinal, key) {
   return 0;
 }
 
-function expectedShare(selfScore, wager, table) {
-  let total = 0;
+// [expected win share, expected winnings]. Winnings = final score x win share.
+function expectedOutcome(selfScore, wager, table) {
+  let share = 0, money = 0;
   const up = selfScore + wager, down = selfScore - wager;
   for (const [weight, ps, tops] of table) {
-    for (const [key, p] of tops) total += weight * p * (ps * shareVsTop(up, key) + (1 - ps) * shareVsTop(down, key));
+    for (const [key, p] of tops) {
+      const sUp = shareVsTop(up, key), sDown = shareVsTop(down, key);
+      share += weight * p * (ps * sUp + (1 - ps) * sDown);
+      money += weight * p * (ps * sUp * up + (1 - ps) * sDown * down);
+    }
   }
-  return total;
+  return [share, money];
 }
+function expectedShare(selfScore, wager, table) { return expectedOutcome(selfScore, wager, table)[0]; }
 
 // Exact expected win share for one wager. correlation defaults to 0 so the
 // hand-derived parity checks use independent outcomes.
@@ -770,13 +776,27 @@ function fjTier2(scores, playerIndex, pSelf, oppCorrect = null, correlation = BE
   candidateSet.add(maxWager);
   if (tier1.minWager != null) { candidateSet.add(tier1.minWager); candidateSet.add(tier1.minWager - 1); }
   if (tier1.lockTieWager != null) candidateSet.add(tier1.lockTieWager);
+  // Breakpoints: wagers that just pass, tie, or just stay above each possible
+  // opponent final score. Win share only changes at these points.
+  for (const o of opponents) {
+    for (const [w] of o.dist) {
+      for (const f of [o.score + w, o.score - w]) {
+        for (const c of [f - selfScore, f - selfScore + 1, selfScore - f, selfScore - f - 1]) candidateSet.add(c);
+      }
+    }
+  }
   const candidates = [...candidateSet].filter(w => w >= 0 && w <= maxWager).sort((a, b) => a - b);
 
   const table = opponentTable(opponents, pSelf, correlation);
-  const results = candidates.map(w => [w, expectedShare(selfScore, w, table)]);
+  const outcomes = {};
+  const results = candidates.map(w => { outcomes[w] = expectedOutcome(selfScore, w, table); return [w, outcomes[w][0]]; });
   const bestProb = Math.max(...results.map(r => r[1]));
-  // Among wagers within rounding of the best, take the smallest.
-  const bestWager = Math.min(...results.filter(r => r[1] >= bestProb - 1e-9).map(r => r[0]));
+  // Win chance first, money second: among wagers tied on win share, take the
+  // highest expected winnings, then the smallest wager. A solo player or a
+  // locked-out leader wins whatever they bet, so only money separates wagers.
+  const tied = results.filter(r => r[1] >= bestProb - 1e-9).map(r => r[0]);
+  const m = w => Math.round(outcomes[w][1] * 1e6) / 1e6;
+  const bestWager = tied.reduce((b, w) => (m(w) > m(b) || (m(w) === m(b) && w < b)) ? w : b, tied[0]);
 
   return { recommendedWager: bestWager, winProbability: bestProb, results, tier1CoverWager: tier1.minWager, tier1LockTie: tier1.lockTieWager, tier1Lockout: tier1.lockout };
 }
@@ -943,7 +963,14 @@ function ddAnalyze(scores, playerIndex, round, pCorrect, remainingClueValues, re
     if (w === bestWager || (bestProb - p) <= z * compSeByWager[w]) plateau.push(w);
   }
   plateau.sort((a, b) => a - b);
-  const recommendedWager = Math.min(...plateau);
+  let recommendedWager = Math.min(...plateau);
+  // Exact ties (same outcome on every trial, e.g. a solo game) cannot differ
+  // in win chance, so pick by money: the DD adds (2p - 1) x wager on average.
+  if (pCorrect > 0.5) {
+    const rv = winVectors[recommendedWager];
+    const exact = candidates.filter(w => winVectors[w].every((x, t) => x === rv[t]));
+    recommendedWager = Math.max(...exact);
+  }
 
   return { recommendedWager, winProbability: bestProb, results, standardErrors, comparisonStandardErrors, plateau, zScoreUsed: z, trials };
 }
@@ -1176,16 +1203,19 @@ function runFJAnalysis() {
   document.getElementById('fj-tier1-amount').textContent =
     t1.lockout ? money(0) : (t1.minWager != null ? money(t1.minWager) : `${money(t1.maxWager)} (can't guarantee)`);
   document.getElementById('fj-tier1-explain').textContent =
-    t1.lockout ? "You're in lockout — no opponent can catch you even if they bet everything and win."
+    scores.length === 1 ? "No rivals, so nothing can beat you — Safe Bet has nothing to guard against. See Smart Bet for the wager that earns the most."
+    : t1.lockout ? "You're in lockout — no opponent can catch you even if they bet everything and win."
     : t1.minWager != null ? "The minimum wager that beats every opponent's worst case outright, regardless of confidence."
     : "Nobody's score covers the leader's worst case — an outright guarantee isn't possible here.";
 
   document.getElementById('fj-tier2-amount').textContent = money(t2.recommendedWager);
   document.getElementById('fj-tier2-explain').textContent =
-    `Using your ${Math.round(confidence * 100)}% confidence against simulated contestants, this maximizes your win chance: ~${Math.round(t2.winProbability * 100)}%.`;
+    scores.length === 1
+      ? `No rivals, so you win whatever you bet. At ${Math.round(confidence * 100)}% confidence this wager earns the most on average${confidence > 0.5 ? ' — bet it all' : confidence < 0.5 ? ' — bet nothing' : ''}.`
+      : `Using your ${Math.round(confidence * 100)}% confidence against simulated contestants, this maximizes your win chance: ~${Math.round(t2.winProbability * 100)}%. Among equally good wagers it takes the one that earns the most.`;
 
   renderCurveChart('fj-bar-chart', t2.results, t2.recommendedWager, {
-    explain: "The gold dot is Smart Bet's pick: the wager with the highest win chance. If several wagers tie, it takes the smallest. A wager that only ties a rival scores half a win, so the curve usually steps up by the extra dollar that turns a tie into a win."
+    explain: "The gold dot is Smart Bet's pick: the wager with the highest win chance. When several wagers win equally often, it takes the one that earns the most on average — so a solo player or a locked-out leader who is sure of the answer bets big. A wager that only ties a rival scores half a win."
   });
 
   const notes = [

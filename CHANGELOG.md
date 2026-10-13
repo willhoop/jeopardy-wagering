@@ -4,6 +4,42 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/). Dates are ISO 8601.
 
+## [2.2.0] - 2026-10-13
+
+Smart Bet now ranks wagers by win chance first and money second. Reported
+bug: a solo game ("Just you") at 100% confidence recommended $0.
+
+### Fixed
+
+- **Ties in win chance went to the smallest wager.** When several wagers
+  win equally often, Tier 2 picked the smallest. A solo player always wins,
+  so every wager tied and the answer was $0 even at 100% confidence. The
+  winner keeps their final total, so ties now go to the wager with the
+  highest expected winnings (final score x win share), then the smallest.
+  Solo at 100% now bets everything; at 30% it bets $0.
+- **The $100 grid missed the best wager in a flat stretch.** Tier 2 now also
+  tries every breakpoint: the wagers that just pass, tie or stay above each
+  possible opponent final score. Python and the app now agree exactly.
+- **Daily Double, exact ties.** Wagers with the same outcome on every
+  simulated trial (for example, a solo game) are now chosen by money: the
+  largest when confidence is above 50%. The statistical plateau rule is
+  unchanged otherwise.
+
+### Record
+
+- **Measured.** Tier 2 recommended wagers, from `engine/fj_bestresponse.py`
+  and the app. Leader 10,000 vs 8,000 vs 3,400 at 89%: $6,001 became
+  $6,599, at the same win share (0.913). It still covers second place, and
+  a miss keeps $3,401, above third place's $3,400. Win shares do not move.
+- **Basis.** unchanged. Same question, same model; the tiebreak between
+  equally good wagers changed.
+- **Supersedes.** ~~$6,001~~ (Tier 2, featured case) retracted, now $6,599.
+  ~~$4,001~~ (Tier 2, tutorial case) retracted, now $4,499. Featured case
+  at 50%: ~~$100~~ retracted, now $2 (a right answer reaches $10,002, just
+  past second place's $10,001 overtake bet). Hand example: ~~$1,001~~
+  retracted, now $3,999. Tier 1 figures are unchanged.
+- **Owed to the next major.** Nothing.
+
 ## [2.1.1] - 2026-10-13
 
 ### Added

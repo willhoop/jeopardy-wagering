@@ -235,3 +235,13 @@ def test_small_confidence_change_no_longer_causes_wild_swings():
     # would call statistically distinguishable from its own best.
     assert rec_42.recommended_wager in rec_44.plateau
     assert rec_44.recommended_wager in rec_42.plateau
+
+
+def test_solo_daily_double_bets_by_money():
+    # Solo: every wager wins on every trial (identical outcomes), so the
+    # Daily Double's own expectation decides: (2p - 1) * w.
+    # p = 0.7 -> legal max (5000); p = 0.3 -> 0.
+    hi = dd_wager.analyze([5000], 0, 2, 0.7, trials_per_wager=50, seed=1)
+    lo = dd_wager.analyze([5000], 0, 2, 0.3, trials_per_wager=50, seed=1)
+    assert hi.recommended_wager == 5000
+    assert lo.recommended_wager == 0

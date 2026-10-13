@@ -44,6 +44,22 @@ confidence and the likely moves of real contestants.
 - A wager that only ties a rival is worth about half a win. One more
   dollar turns that tie into a win. For this reason, Smart Bet usually
   takes the extra dollar when a tie is in play.
+- Often a range of wagers gives the same win chance. Then Smart Bet uses
+  a second rule: it picks the wager in the range that wins the most money
+  on average. The winner keeps their final total, so money is the fair
+  tiebreak. Example: you have $12,000, and your rivals have $8,000 and
+  $6,000. Safe Bet is $4,001. At 50%, 70% or 90% confidence, every
+  wager from $4,001 to $4,499 gives the same win chance, so Smart Bet
+  recommends $4,499.
+
+## Why Smart Bet uses money to break ties
+
+Before version 2.2, Smart Bet took the smallest of the tied wagers. A
+user found the problem: in a solo game at 100% confidence, Smart Bet
+said $0. A solo player always wins, so every wager tied, and the
+smallest was $0. But the player keeps the money. So Smart Bet now ranks
+wagers by win chance first and money second. The same rule makes a
+leader who is locked out and sure of the answer bet big.
 
 ## How Smart Bet models opponents
 
@@ -96,6 +112,11 @@ Each simulated result has some uncertainty, as a poll has a margin of
 error. When the simulation cannot separate some wagers, the app shows a
 shaded **plateau** on the chart. The app recommends the smallest wager in
 the plateau. The evidence does not support a larger risk.
+
+One case is different. Some wagers give exactly the same result in every
+simulated game, for example in a solo game. More simulation cannot
+separate them. For these exact ties, the engine picks by money: if you
+are more likely right than wrong, it recommends the largest of them.
 
 ## What is proven, and what is assumed
 
