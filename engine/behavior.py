@@ -8,10 +8,17 @@ and the app's JavaScript port (app/index.html) all read from it.
 Sources:
   [T13] Tesauro, Gondek, Lenchner, Fan & Prager (2013), "Analysis of
         Watson's Strategies for Playing Jeopardy!", JAIR 47:205-251,
-        section 2.2 (Daily Double), section 2.3 (Final Jeopardy).
+        doi:10.1613/jair.3834, section 2.2 (Daily Double), section 2.3
+        (Final Jeopardy). Data from the mid-1990s to 2012 at the latest.
   [TB]  Jeopardy! tie rule, in force since the 24 November 2014 episode:
         a tie for first after Final Jeopardy is settled by a tiebreaker
         clue. Before that date, tied players both returned as co-champions.
+        Rule: Wikipedia, "Jeopardy!" (rules section),
+        https://en.wikipedia.org/wiki/Jeopardy!
+        Date: Jeopardy! History Wiki, Season 31 timeline (show #6946),
+        https://jeopardyhistory.fandom.com/wiki/Jeopardy!_Timeline_(syndicated_version)/Season_31
+        History (October 2014 ties, 2016 announcement, first regular-play
+        tiebreaker in 2018): C. McNear, The Ringer, 2021,
         https://www.theringer.com/2021/01/23/tv/jeopardy-tiebreaker-scenario-rules-changes
 
 Every value is marked CALIBRATED (fitted privately to modern-era data,
@@ -40,7 +47,7 @@ TIEBREAKER_RULE = True
 # calibration on J! Archive season statistics for Seasons 38-41 (2021-2025).
 # J! Archive's terms forbid republishing its data, so the source statistics
 # are not kept in this repository and are not quoted in any document
-# (ADR-0004). Values marked PUBLISHED [T13] describe 1990s-2012 play and are
+# (ADR-0004). Values marked PUBLISHED [T13] describe pre-2013 play and are
 # kept only where no modern calibration exists.
 
 # Final Jeopardy accuracy by score rank entering FJ (leader, second, third).
@@ -66,7 +73,7 @@ DD_WAGER_FRACTION_BY_ROUND = {1: 0.87, 2: 0.46}
 DD_FINDER_WEIGHTS_BY_RANK = (0.41, 0.30, 0.29)
 
 # Second-place ("B") wager mix. PUBLISHED [T13 s2.3] for the regime
-# B >= 3/4 A and B >= 2C, from 1990s-2012 games: no modern calibration
+# B >= 3/4 A and B >= 2C, from pre-2013 games: no modern calibration
 # exists, so this is the oldest part of the model. ASSUMED to hold in the
 # other five regimes and in the modern era: when a
 # bet type does not exist in a regime, its weight is shared out
@@ -91,8 +98,9 @@ A_WEIGHTS = {
 # Leader in a lockout (A > 2B). ASSUMED split.
 A_LOCKOUT_WEIGHTS = {"zero": 0.5, "max_safe": 0.5}
 
-# Third place ("C"). [T13 s2.3, note 5] PUBLISHED that C's wagers do not
-# vary with the game state. The flat shape over the random grid is ASSUMED.
+# Third place ("C"). [T13 s2.3, note 5] PUBLISHED that T13 found no evidence
+# that C's wagers track the game state. The flat shape over the random grid
+# is ASSUMED.
 # The random grid: 0, 1/4, 1/2, 3/4 and all of the score.
 RANDOM_GRID_QUARTERS = (0, 1, 2, 3, 4)
 

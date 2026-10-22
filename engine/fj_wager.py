@@ -7,14 +7,14 @@ threatening legal play against you — betting their full score and answering
 correctly?
 
 It does not model opponent psychology, category confidence, or the odds of
-answering correctly. That is the Tier 2 (best-response / Monte Carlo) layer
-described in docs/explanation/wagering-theory-research.md, section 3.3, and
-is not built yet. Tier 1 answers "what wager can't hurt me if I'm right?",
-not "what wager maximizes my win probability?".
+answering correctly. That is the Tier 2 (best-response) layer, which lives
+in engine/fj_bestresponse.py. Tier 1 answers "what wager can't hurt me if
+I'm right?", not "what wager maximizes my win probability?".
 
 References: Williams, K., "How to wager in Final Jeopardy!," The Final Wager
-(https://thefinalwager.wordpress.com/tutorial/); Dupee, C. (1998); Tesauro,
-Gondek, Lenchner, Fan & Prager (2013), JAIR 47:205-251.
+(https://thefinalwager.wordpress.com/tutorial/); Dupée, M. (1998), How to Get
+on Jeopardy!--and Win!, as cited by Tesauro, Gondek, Lenchner, Fan & Prager
+(2013), JAIR 47:205-251, doi:10.1613/jair.3834.
 """
 
 from dataclasses import dataclass, field
@@ -78,8 +78,10 @@ class FJRecommendation:
         if self.lock_tie_wager is not None:
             lines.append(
                 f"Lock-tie available: wagering ${self.lock_tie_wager} and "
-                f"answering correctly guarantees at least a tie for first, "
-                f"regardless of the binding opponent's own wager."
+                f"answering correctly ties for first if opponent "
+                f"{self.binding_opponent_index} bets $0 (they have no need to "
+                f"bet). It is not a guarantee: if they bet and are right, "
+                f"they pass you. A tie goes to a tiebreaker clue."
             )
         lines.extend(self.notes)
         return "\n".join(lines)
@@ -121,8 +123,9 @@ def analyze(scores: List[int], player_index: int) -> FJRecommendation:
         )
 
     # The binding constraint is whichever opponent's worst-case ceiling is
-    # highest. Beating the largest threat beats every opponent's threat,
-    # because each opponent's wager and correctness are independent events.
+    # highest. Every opponent can reach their own ceiling in the same game,
+    # so beating the highest ceiling beats them all; no independence is
+    # needed.
     ceilings = [(i, worst_case_ceiling(s)) for i, s in opponents]
     binding_index, binding_ceiling = max(ceilings, key=lambda pair: pair[1])
 

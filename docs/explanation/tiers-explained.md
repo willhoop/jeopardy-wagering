@@ -26,7 +26,8 @@ mid-game Daily Double. The app shows both as **Smart Bet**.
 ## How ties are scored
 
 Since the 24 November 2014 episode, a tie for first after Final Jeopardy
-goes to a tiebreaker clue. Only the winner of that clue returns. Smart Bet
+goes to a tiebreaker clue (sources: Wikipedia, "Jeopardy!", rules section;
+Jeopardy! History Wiki, Season 31 timeline). Only the winner of that clue returns. Smart Bet
 gives each tied player an equal chance in the tiebreaker. A two-way tie
 is half a win. A three-way tie is one third of a win. If every player
 ends at $0 or less, nobody wins.
@@ -82,8 +83,9 @@ the modern era:
   score.
 
 Second place's wager mix has no modern source. It still comes from a
-published study of games from 1990s-2012 (Tesauro et al., 2013). Third
-place's bets do not depend on the scores, also from that study.
+published study of pre-2013 games (Tesauro et al., 2013). That study
+found no evidence that third place's bets track the scores, so the model
+spreads them evenly (an assumption).
 `engine/behavior.py` marks each value as CALIBRATED, PUBLISHED or
 ASSUMED.
 
@@ -127,7 +129,7 @@ Smart Bet and the Daily Double engine need a model of opponents. Part of
 that model is calibrated to modern-era play: Final Jeopardy accuracy by
 score rank, the outcome correlation, the leader's cover share, Daily
 Double accuracy, the Daily Double wager size and who finds a Daily
-Double. Part is published from older games (1990s-2012): the
+Double. Part is published from older games (pre-2013): the
 second-place wager mix in one score regime. The other parts are
 assumptions: the split of the leader's bets, the second-place mix in the
 other five regimes, the third-place shape, equal tiebreaker odds, and

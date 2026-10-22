@@ -20,10 +20,11 @@ scraper built against J-Archive directly would break those terms.
 
 Three usable alternatives exist:
 
-- **jwolle1/jeopardy_clue_dataset** (GitHub). 538,845 clues through Season 41.
-  Each row lists the clue value, the Daily Double wager (zero if not a DD),
-  round, and category. A companion file gives each contestant's score after
-  the Single, Double, and Final rounds. The README states two restrictions:
+- **jwolle1/jeopardy_clue_dataset** (GitHub). 538,845 clues as of the Season
+  41 release (the README listed 554,131 clues through Season 42 in July
+  2026). Each row lists the clue value, the Daily Double wager (zero if not a
+  DD), round, and category. A companion file gives contestant scores, Coryat
+  scores and right/wrong counts. The README states two restrictions:
   the source "prefers not to be credited," and the data must not be used "to
   make a public-facing web site, app, or any other product." This makes the
   dataset usable for internal calibration and validation only — not for a
@@ -52,14 +53,17 @@ See ADR-0001.
   score (B), A cannot lose regardless of the FJ outcome and does not need to
   wager.
 - **Cover bet:** if A holds less than double B, A should wager at least
-  `2B - A` to stay ahead even if B doubles up and A misses.
+  `2B - A + 1`, so that a correct answer keeps A ahead even if B doubles up.
+  (`2B - A` only ties.)
 - **Bet-to-tie:** in some score ranges, wagering to land on an exact tie beats
   a full cover bet, because it changes which outcomes A needs to win.
-- **Two-thirds rule** (Dupee, 1998): if B holds less than two-thirds of A's
-  score, B's expected value from wagering zero (hoping A misses) can exceed
-  the expected value of trying to overtake A. This is a heuristic threshold.
-  The true break-even point depends on each player's real confidence in the
-  category, which opponents cannot observe.
+  (Advice from the co-champion era, before November 2014; under the
+  tiebreaker rule a tie is worth less than a win.)
+- **Two-thirds rule** (Dupée, 1998, as cited by Tesauro et al.): if B holds
+  at least two-thirds of A's score and A bets to cover, B should wager no
+  more than `3B - 2A`. B then wins whenever A misses, whether or not B is
+  right. Betting more makes B also need a correct answer. A can counter
+  with an "anti-two-thirds" bet (Tesauro et al., §1.1).
 
 ### 3.2 Three-player heuristics
 
@@ -67,11 +71,10 @@ Williams frames the three-player case as three pairwise sub-problems: A vs.
 B, B vs. C, and A vs. C. The wager must satisfy all three constraints at
 once, which sometimes forces a tie-wager instead of a clean cover.
 
-Tesauro et al. found that human C-place (third-place) wagers show almost no
-dependence on game state — third-place bettors behave close to randomly. A
-and B, by contrast, show strong, learnable patterns; the Watson team split
-their behavior into six empirically distinct regimes based on B's score
-relative to A and to C.
+Tesauro et al. found no evidence that third-place (C) wagers vary with the
+strategic situation and used one C model for all groups (§2.3, note 5).
+They split A and B behavior into six groups at strategic breakpoints: B/A
+below 2/3, 2/3 to 3/4, above 3/4, crossed with whether B is at least 2C.
 
 ### 3.3 Game-theoretic layer
 
@@ -102,17 +105,18 @@ confidence is unusually low.
 
 ### 4.1 Empirical baseline
 
-Tesauro et al. report DD accuracy varies strongly by round and row (a proxy
-for clue difficulty): roughly 72% on the easiest (top) row of second-round
-DDs, falling to roughly 57% on the hardest (bottom) row. A full breakdown by
-round and row needs a closer read of the paper's tables before it goes into
-our model's calibration data.
+Tesauro et al. report that second-round DD accuracy by row (a proxy for
+clue difficulty) is about 72% for the top two rows, falling to about 57%
+for the bottom row (§3.1.4). Overall mean DD accuracy is 64% for average
+contestants (§2.2).
 
 The paper's central finding on human behavior: contestants underbet DDs
 relative to the wager that maximizes win probability. In last-DD situations
-(second round, no DDs remaining), leading players bet $2,590 on average
-against a $5,380 recommended optimum; trailing players bet $3,120 against a
-recommended $6,970. Quantifying this conservatism gap — how much win
+(second round, no DDs remaining; the subset of more than 2,200 regular
+episodes in which both second-round DDs were played), leading players bet
+$2,590 on average against a $5,380 average simulator-recommended bet at
+row-based default confidence; trailing players bet $3,120 against $6,970
+(§3.1.4, Table 3). Quantifying this conservatism gap — how much win
 probability a real bet leaves on the table — is a natural benchmark output
 for our tool.
 
@@ -211,9 +215,11 @@ Future ideas (not built, just logged):
 - Tesauro, G., Gondek, D., Lenchner, J., Fan, J., & Prager, J. M. (2013).
   Analysis of Watson's strategies for playing Jeopardy!. Journal of
   Artificial Intelligence Research, 47, 205–251.
-  https://arxiv.org/pdf/1402.0571
+  https://doi.org/10.1613/jair.3834 (preprint: https://arxiv.org/pdf/1402.0571)
 - Williams, K. "How to wager in Final Jeopardy!" The Final Wager.
   https://thefinalwager.wordpress.com/tutorial/
+- Dupée, M. (1998). How to Get on Jeopardy!—and Win! Citadel Press.
+  (Cited from Tesauro et al., 2013; not read directly.)
 - jwolle1. jeopardy_clue_dataset. GitHub.
   https://github.com/jwolle1/jeopardy_clue_dataset
 - J! Archive Wagering Calculator. https://j-archive.com/wageringcalculator.php

@@ -1,6 +1,8 @@
 # Jeopardy! Wagering Strategy: A Practical Model for Daily Double and Final Jeopardy Bets
 
-Version 2.2 — 2026-10-13 (Tier 2 now breaks ties in win share by expected
+Version 2.2.1 — 2026-10-22 (2.2.1 corrects source citations and adds an
+independent check of the Final Jeopardy math; no figure moves. In 2.2, Tier 2
+began breaking ties in win share by expected
 winnings instead of taking the smallest wager, so some recommended wagers
 move and no win share does. Version 2.1 recalibrates the simulated rivals to
 modern-era play.)
@@ -19,7 +21,8 @@ against either a citation or a worked example, not take it on faith.
 **Correction (2.0.0).** Versions before 2.0 scored a tie for first as a full
 win, on the grounds that co-champions both return. That rule ended with the
 24 November 2014 episode: a tie for first after Final Jeopardy now goes to a
-tiebreaker clue, and only the winner returns (The Ringer, 2021). The engines
+tiebreaker clue, and only the winner returns (Wikipedia, "Jeopardy!";
+Jeopardy! History Wiki, Season 31). The engines
 now score a k-way tie for first as 1/k of a win, and nobody wins at \$0 or
 less. Every 1.x statement that ties count as wins is withdrawn, and every
 Tier 2 and Daily Double figure computed under it has been removed from this
@@ -30,7 +33,8 @@ simulated contestant behavior (ADR-0003, section 5.3).
 
 **Change in 2.1.** Version 2.0 took opponent accuracy, the outcome
 correlation, the leader's cover rate and all Daily Double behavior from
-Tesauro et al. (2013), whose data end in 2012. Play changed in the 2010s:
+Tesauro et al. (2013), whose data run from the mid-1990s to 2012 at the
+latest. Play changed in the 2010s:
 contestants now hunt Daily Doubles and bet them much harder. Version 2.1
 recalibrates those inputs to Seasons 38-41 (2021-2025), privately, on J!
 Archive season statistics whose terms forbid republication (ADR-0004,
@@ -97,14 +101,17 @@ That search surfaced three kinds of material, each treated differently:
   because it's the only source that is both rigorous and legally clean to
   cite from.
 - **Expert practitioner writing, not peer-reviewed but influential**: Keith
-  Williams' "The Final Wager" (a tutorial series by a former College
-  Jeopardy! Champion) and Chuck Dupee's 1998 wagering analysis, both of
-  which independently arrived at heuristic rules — the cover bet, the
-  two-thirds rule — that the Tesauro paper later confirmed empirically
-  describe how real contestants tend to bet (imperfectly).
+  Williams' "The Final Wager" (a tutorial site by the 2003 College
+  Jeopardy! Champion) and Michael Dupée's 1998 book *How to Get on
+  Jeopardy!—and Win!*, which Tesauro et al. cite for its analysis of the
+  "two-thirds" scenario. The cover bet was already standard practice:
+  Tesauro et al. call it a "well-known strategy" and model the two-thirds
+  bet as one of second place's bet types.
 - **Pre-scraped historical datasets on GitHub** (e.g., jwolle1's
-  `jeopardy_clue_dataset`, 538,845 clues with Daily Double wager amounts and
-  round-end scores). These looked, at first glance, like the ideal
+  `jeopardy_clue_dataset`, 538,845 clues as of the Season 41 release, with
+  Daily Double wager amounts, contestant scores, Coryat scores and
+  right/wrong counts; the README listed 554,131 clues through Season 42 in
+  July 2026). These looked, at first glance, like the ideal
   calibration source. Reading the dataset's own README changed that: it
   explicitly asks that the data not be used to build a public-facing
   product. That single sentence is why this project does not use that
@@ -122,7 +129,7 @@ project follows the same two-layer structure: a guarantee-based layer that
 needs no behavioral assumptions (Tier 1), and a best-response layer that
 does (Tier 2 / the DD engine). Every behavioral number in the second layer
 is labeled CALIBRATED (set privately from modern-era season statistics,
-ADR-0004), PUBLISHED (taken from Tesauro et al., 1990s-2012 play, kept only
+ADR-0004), PUBLISHED (taken from Tesauro et al., pre-2013 play, kept only
 where no modern source exists) or ASSUMED (our choice where no source gives
 a number).
 
@@ -137,7 +144,7 @@ amended by ADR-0004 (`docs/adr/0004-modern-era-calibration.md`):
 | J! Archive game pages | Nothing (not scraped) | Same terms |
 | jwolle1/jeopardy_clue_dataset | Nothing shipped; internal validation only, if used at all | README forbids public-facing product use |
 | J! Archive's own Wagering Calculator | Reference point to sanity-check against | N/A — a tool, not a data source |
-| Tesauro et al. (2013), JAIR | PUBLISHED values cited in this paper (1990s-2012 play) | None — published research |
+| Tesauro et al. (2013), JAIR | PUBLISHED values cited in this paper (pre-2013 play) | None — published research |
 
 **Decision:** this paper, the app and the deck cite only the Tesauro et al.
 published statistics. The modern-era source statistics are not kept in the
@@ -209,10 +216,11 @@ than pretending otherwise.
 **Lock-tie:** a special case. If your score is *exactly half* of the binding
 opponent's score, and that opponent is themselves already safe against
 everyone else (so they have no reason to wager anything), then betting
-everything and answering correctly guarantees at least a tie for first.
-Under the current rule a tie for first goes to a tiebreaker clue, so a
-lock-tie guarantees a place in the tiebreaker, not a win. It matters only
-when no outright cover is possible: then it is the best guarantee Tier 1 can
+everything and answering correctly ties for first if that opponent bets
+\$0. It is not a guarantee: if that opponent bets and is right, they pass
+you. Under the current rule a tie for first goes to a tiebreaker clue, so a
+lock-tie earns at best a place in the tiebreaker, not a win. It matters
+only when no outright cover is possible: then it is the best Tier 1 can
 offer. Tier 1's premise that the leader bets nothing is a worst-case
 convenience, not a prediction; section 5.4 shows what the lock-tie is worth
 against simulated opponents.
@@ -299,8 +307,9 @@ p_i(f) = Phi( (Phi^{-1}(p_i) - sqrt(r) * f) / sqrt(1 - r) )
 ```
 
 The correlation is CALIBRATED to modern-era play (ADR-0004). It is lower
-than the value Tesauro et al. (2013, section 2.3) report for 1990s-2012
-games. We read it as the correlation of the binary right/wrong outcomes and
+than the value Tesauro et al. (2013, section 2.3) report for pre-2013
+games. Following T13's own definition (section 1.1), we read it as the
+correlation of the binary right/wrong outcomes and
 convert it to the latent correlation with Sheppard's formula (Sheppard,
 1899), `rho_binary = (2/pi) * arcsin(r)`, so
 
@@ -368,14 +377,14 @@ and ADR-0004.
 
 | Quantity | Value | Status |
 |---|---|---|
-| B wager mix | all-in 26%; keep C out (bet below B-2C, or cover with 2C-B+1) 27%; overtake A (A-B+1) 15%; two-thirds (3B-2A-1) 8%; random 24% | PUBLISHED from 1990s-2012 games, for the regime B >= 3/4 A and B >= 2C (T13 section 2.3). No modern source exists. ASSUMED to hold in the other five regimes and in the modern era. |
+| B wager mix | all-in 26%; keep C out (bet below B-2C, or cover with 2C-B+1) 27%; overtake A (A-B+1) 15%; two-thirds (3B-2A-1) 8%; random 24% | PUBLISHED from pre-2013 games, for the regime B >= 3/4 A and B >= 2C (T13 section 2.3). The "cover with 2C-B+1" branch of keep-C-out is an ASSUMED extension: it applies only when B < 2C, outside the published regime. No modern source exists. ASSUMED to hold in the other five regimes and in the modern era. |
 | A wager mix, not locked out | the cover bet 2B-A+1 most of the time; small shares for the tie-cover 2B-A, all-in and a random bet | Share of bets that cover second place: CALIBRATED (leaders almost always cover). The split between bet types: ASSUMED. |
 | A wager mix, lockout (A > 2B) | \$0 50%; largest safe bet A-2B-1 50% | ASSUMED. |
-| C wager | random | PUBLISHED that C's bets do not depend on the game state (T13 section 2.3, note 5; 1990s-2012). The flat shape is ASSUMED. |
+| C wager | even spread over the random grid | PUBLISHED that T13 found no evidence that C's bets track the game state, and used one C model for all groups (T13 section 2.3, note 5; pre-2013). The even spread is ASSUMED. |
 | "Random" bet | equal weight on 0, 1/4, 1/2, 3/4 and all of the score | ASSUMED. |
 | Missing bet types | weight shared out in proportion among the bet types that exist | ASSUMED. |
 | Opponent FJ accuracy | by score rank entering Final Jeopardy: the leader is right more often than second place, and second place more often than third | CALIBRATED. |
-| Outcome correlation | positive, across all players including the user; lower than the 1990s-2012 value in T13 | CALIBRATED. The binary-scale reading is ASSUMED. |
+| Outcome correlation | positive, across all players including the user; lower than the pre-2013 value in T13 | CALIBRATED. The binary-scale reading follows T13's own definition (section 1.1); the Sheppard conversion is exact only at 50% accuracy. |
 | Tiebreaker odds | equal, 1/k | ASSUMED. |
 
 T13 is Tesauro et al. (2013). Example: for the scores
@@ -388,11 +397,12 @@ Honest limits:
 
 - Five of the six B regimes, A's split between bet types and C's shape are
   our assumptions, not fitted values.
-- The published B weights come from groups of only a few hundred games each
-  (T13 section 2.3), so even they carry wide error bars. They describe
-  1990s-2012 play; second place's wager mix, the largest behavioral
+- The published B weights come from groups of only a few hundred samples
+  (non-locked Final Jeopardy situations) each (T13 section 2.3), so even
+  they carry wide error bars. They describe pre-2013 play; second place's wager mix, the largest behavioral
   component in Final Jeopardy, has no modern source.
-- The correlation is read as a binary correlation and converted with
+- The correlation is a binary correlation, as T13 defines it (section
+  1.1: rho = P(RR) + P(WW) - P(RW) - P(WR)). It is converted with
   Sheppard's formula, which is exact only at 50% accuracy. Modern average
   accuracy is below 50%, so the conversion is approximate.
 - The user's own confidence `p` is self-reported and is not calibrated.
@@ -594,9 +604,10 @@ of this writing.
 
 ## 7. Validation
 
-**Method.** 49 automated Python tests (`cd tests && python -m pytest -q`,
-49 passed on 2026-10-13): 9 for Tier 1, 11 for Tier 2, 11 for the behavior
-model, 12 for the Daily Double engine, 6 for the rollout simulator. A
+**Method.** 54 automated Python tests (`cd tests && python -m pytest -q`,
+54 passed on 2026-10-22): 9 for Tier 1, 5 for the Final Jeopardy rules,
+11 for Tier 2, 11 for the behavior model, 12 for the Daily Double engine,
+6 for the rollout simulator. A
 separate harness, `node tests/js_parity.js`, runs 27 checks against the
 JavaScript port in `app/index.html` (27 passed on 2026-10-13). CI runs both on
 every push and pull request.
@@ -620,6 +631,28 @@ every push and pull request.
   the hand derivation, not the model's calibrated value). Then P(both
   wrong) = 0.25 + 0.3 × 0.25 = 0.325, so the win share is 0.5 + 0.325 =
   0.825; the quadrature gives 0.825 within 1.4e-10.
+- **Final Jeopardy rules** (`tests/test_fj_rules.py`). Tier 1 is checked
+  against brute force: every legal wager and right/wrong outcome of every
+  opponent, for every 2- and 3-player game with scores from -\$2 to \$12
+  (whole dollars; the logic is scale-free). Brute force uses no formula, so
+  it checks the cover and lockout logic independently. The standard rules
+  are derived by hand: the leader's shut-out bet 2B-A+1 beats every
+  second-place outcome when right, and 2B-A only ties; the two-thirds limit
+  3B-2A lets second place win whenever a covering leader misses, and one
+  dollar more only ties; lockout needs A > 2B, and A = 2B exactly is a
+  tiebreaker, not a win.
+- **Independent check of Tier 2 (2.2.1, not in CI).** A separate script
+  recomputes the win share with different numerics: 80-point Gauss-Hermite
+  quadrature over the shared factor and scipy's normal distribution, instead
+  of the engine's 49-node trapezoid rule and its own normal functions, with
+  its own scoring code. Sample: 609 game states (9 fixed cases from this
+  paper plus 600 random ones, including tied scores, exact halves, negative
+  scores, solo games and 0% and 100% confidence). Largest difference:
+  3.3e-10. A third method, plain Monte Carlo sampling of the same model
+  (60,000 games each), agrees within 0.9 standard errors on the three
+  featured cases (91.3%, 85.8%, 36.9%). This shows the engine computes the
+  model correctly. It cannot show the model is right, because all three
+  methods share the model.
 - **Shipped-default regression.** For \$10,000 / \$8,000 / \$3,400 and
   \$12,000 / \$9,000 / \$3,000 at 89%, Tier 2 must not recommend the
   tie-only bet 2B-A.
@@ -654,8 +687,8 @@ In order of how much they matter:
    regimes, A's split between bet types, C's shape, the random grid, and
    equal tiebreaker odds. Treat Tier 2 and Daily Double win shares as model
    outputs, not validated statistics.
-2. **Second place is still pre-2012.** Second place's wager mix, the
-   largest behavioral component in Final Jeopardy, comes from 1990s-2012
+2. **Second place is still pre-2013.** Second place's wager mix, the
+   largest behavioral component in Final Jeopardy, comes from pre-2013
    games (Tesauro et al., 2013), on small samples. No modern source exists.
 3. **Terms-of-use risk, accepted (ADR-0004).** The CALIBRATED values are
    model settings visible in `engine/behavior.py` and in the app's public
@@ -696,10 +729,19 @@ In order of how much they matter:
 - Tesauro, G., Gondek, D., Lenchner, J., Fan, J., & Prager, J. M. (2013).
   Analysis of Watson's strategies for playing Jeopardy!. *Journal of
   Artificial Intelligence Research*, 47, 205–251.
-  https://arxiv.org/pdf/1402.0571
-- The Ringer (2021, January 23). Article on the Jeopardy! tiebreaker
-  scenario and its rule changes (title not reproduced here). Source for the
-  November 2014 change from co-champions to a tiebreaker clue.
+  https://doi.org/10.1613/jair.3834 (preprint: https://arxiv.org/pdf/1402.0571)
+- Wikipedia. "Jeopardy!" (rules section). Source for the current tie rule:
+  since November 2014 a tie for first is resolved by a tiebreaker clue, and
+  nobody wins if no player has a positive total.
+  https://en.wikipedia.org/wiki/Jeopardy!
+- Jeopardy! History Wiki. "Jeopardy! Timeline (syndicated version)/Season
+  31". Source for the date: show #6946, aired 24 November 2014.
+  https://jeopardyhistory.fandom.com/wiki/Jeopardy!_Timeline_(syndicated_version)/Season_31
+- McNear, C. (2021, January 23). The Ringer. Article on the history of the
+  Jeopardy! tiebreaker (title not reproduced here). Source for the history:
+  the change followed the October 2014 co-champion ties, was formally
+  announced in 2016, and the first regular-play tiebreaker came in 2018. It
+  does not give the November 2014 date.
   https://www.theringer.com/2021/01/23/tv/jeopardy-tiebreaker-scenario-rules-changes
 - Sheppard, W. F. (1899). On the application of the theory of error to cases
   of normal distribution and normal correlation. *Philosophical Transactions
@@ -709,8 +751,8 @@ In order of how much they matter:
   Hall. (Multiple-comparisons-with-the-best, section 6.4.)
 - Williams, K. "How to wager in Final Jeopardy!" *The Final Wager*.
   https://thefinalwager.wordpress.com/tutorial/
-- Dupee, C. (1998). Wagering strategy analysis for Final Jeopardy!, as
-  cited and summarized in Tesauro et al. (2013).
+- Dupée, M. (1998). *How to Get on Jeopardy!—and Win!* Citadel Press.
+  (Cited from Tesauro et al., 2013; not read directly.)
 - jwolle1. jeopardy_clue_dataset [dataset]. GitHub. Referenced for its
   reuse restriction, not used as a data source in this project.
   https://github.com/jwolle1/jeopardy_clue_dataset

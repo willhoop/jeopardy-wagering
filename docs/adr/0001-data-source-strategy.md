@@ -13,8 +13,10 @@ the engine's predictions match real outcomes.
 
 J-Archive's site terms forbid scraping, republishing, or monetizing its
 content. The most complete derived dataset available, jwolle1's
-`jeopardy_clue_dataset` on GitHub (538,845 clues, with Daily Double wager
-amounts and round-end scores), carries its own restriction: its README says
+`jeopardy_clue_dataset` on GitHub (538,845 clues as of the Season 41
+release; the README listed 554,131 clues through Season 42 in July 2026;
+with Daily Double wager amounts, contestant scores, Coryat scores and
+right/wrong counts), carries its own restriction: its README says
 not to use the data "to make a public-facing web site, app, or any other
 product," and the source prefers not to be credited.
 

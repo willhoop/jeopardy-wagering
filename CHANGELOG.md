@@ -4,6 +4,59 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/) and
 [Semantic Versioning](https://semver.org/). Dates are ISO 8601.
 
+## [2.2.1] - 2026-10-22
+
+A triple-check of the Final Jeopardy logic, the sources and the paper math.
+No recommendation or win share moves; several statements about the sources
+were wrong and are corrected.
+
+### Fixed
+
+- **Two-thirds rule stated backwards** (research memo). It applies when
+  second place has *at least* two-thirds of the leader's score: B bets no
+  more than 3B - 2A and wins whenever a covering leader misses. The memo
+  said "less than two-thirds". The cover bet there also read 2B - A (a tie);
+  it is 2B - A + 1.
+- **Lock-tie "guarantee".** Tier 1's lock-tie text said a correct all-in bet
+  ties for first "regardless of the binding opponent's own wager". It ties
+  only if that opponent bets $0; if they bet and are right, they pass you.
+  Fixed in `engine/fj_wager.py` and the docs.
+- **Citations.** Dupée's 1998 book (not "Chuck Dupee", not a wagering
+  "analysis"); the 24 November 2014 tie-rule date now cites Wikipedia and
+  the Jeopardy! History Wiki (The Ringer gives the history, not the date);
+  Tesauro et al. give no end year for their data ("mid-1990s" onward,
+  submitted 2012), now "pre-2013"; they *define* their correlation on the
+  binary outcomes, so that reading is published, not assumed; their
+  last-Daily-Double wagers come from a 2,200-episode subset and a simulator
+  recommendation; they found no evidence that third place's bets track the
+  game state (not "random"); Masters scores in points, not dollars; the
+  jwolle1 clue count is dated; the Williams/Dupée passage no longer claims
+  Tesauro "confirmed" their rules.
+
+### Added
+
+- `tests/test_fj_rules.py` (5 tests): Tier 1 against brute force over every
+  legal wager and outcome on small integer games (2 and 3 players); the
+  leader's shut-out bet 2B - A + 1; the two-thirds limit 3B - 2A; lockout
+  A > 2B and the exact-double tiebreaker case. All derived by hand.
+- `build/pptx_to_pdf.py`: renders the deck to PDF with PyMuPDF, since
+  PowerPoint and LibreOffice are not available to the build.
+- White paper section 7: an independent check of Tier 2 (different
+  numerics, plus plain Monte Carlo sampling).
+
+### Record
+
+- **Measured.** Nothing moves. Tier 2 agrees with an independent
+  implementation to 3.3e-10 across 609 game states; Tier 1 agrees with
+  brute force on every small game tried.
+- **Basis.** unchanged.
+- **Supersedes.** ~~"two-thirds rule: if B holds less than two-thirds"~~
+  retracted. ~~"lock-tie guarantees at least a tie regardless of the
+  opponent's wager"~~ retracted. ~~"Dupee, C. (1998). Wagering strategy
+  analysis"~~ retracted. ~~"Masters final decided by dollar totals"~~
+  retracted.
+- **Owed to the next major.** Nothing.
+
 ## [2.2.0] - 2026-10-13
 
 Smart Bet now ranks wagers by win chance first and money second. Reported

@@ -10,7 +10,8 @@ Version: 2.1.0 (2026-10-13).
 ## Scoring rule (all Tier 2 and Daily Double functions)
 
 A tie for first goes to a tiebreaker clue. This rule applies to every
-episode since 24 November 2014. The engines return a **win share**:
+episode since 24 November 2014 (Wikipedia, "Jeopardy!", rules section;
+Jeopardy! History Wiki, Season 31 timeline, show #6946). The engines return a **win share**:
 
 | Final result | Win share |
 |---|---|
@@ -39,7 +40,7 @@ Each value has one of three labels:
   2021-2025, ADR-0004). The source data must not be republished, so this
   page does not give these values. See `engine/behavior.py` for the value.
 - **PUBLISHED**: from Tesauro et al. (2013), which describes games from
-  1990s-2012.
+  the mid-1990s to 2012 at the latest.
 - **ASSUMED**: our choice.
 
 | Name | Status | Meaning |
@@ -51,7 +52,7 @@ Each value has one of three labels:
 | `DD_ACCURACY` | CALIBRATED | Daily Double accuracy. Default for future Daily Doubles in a rollout. See `engine/behavior.py` for the value. |
 | `DD_WAGER_FRACTION_BY_ROUND` | CALIBRATED | Dict `{round: fraction}`. The fraction of the finder's score that a future Daily Double wager takes, for round 1 and round 2. See `engine/behavior.py` for the value. |
 | `DD_FINDER_WEIGHTS_BY_RANK` | CALIBRATED | Tuple of three weights: the relative chance that the leader, second or third finds a future Daily Double. See `engine/behavior.py` for the value. |
-| `B_WEIGHTS` | PUBLISHED for one regime (1990s-2012), ASSUMED for five | Second-place wager mix: `bankroll`, `keepout_c`, `overtake_a`, `two_thirds`, `random`. No modern calibration exists. |
+| `B_WEIGHTS` | PUBLISHED for one regime (pre-2013), ASSUMED for five | Second-place wager mix: `bankroll`, `keepout_c`, `overtake_a`, `two_thirds`, `random`. No modern calibration exists. |
 | `A_WEIGHTS` | Cover share CALIBRATED; split ASSUMED | Leader wager mix when not locked out: `cover`, `cover_tie`, `bankroll`, `random`. See `engine/behavior.py` for the value. |
 | `A_LOCKOUT_WEIGHTS` | ASSUMED | Leader wager mix in a lockout: `zero` and `max_safe`, equal weights. |
 | `RANDOM_GRID_QUARTERS` | ASSUMED | `(0, 1, 2, 3, 4)`. The "random" bet: an equal spread over 0, 1/4, 1/2, 3/4 and all of the score. |
@@ -75,7 +76,7 @@ third (C). Equal scores go to the lower index first.
 - A, not locked out: uses `A_WEIGHTS`.
 - A, in a lockout (A > 2B): uses `A_LOCKOUT_WEIGHTS`.
 - B: uses `B_WEIGHTS`.
-- C: uses the random grid only.
+- C: uses the random grid only. Tesauro et al. found no evidence that C's bets track the game state; the even spread is ASSUMED.
 
 If a bet type does not exist in a state, the function shares its weight
 among the other bet types, in proportion. Each wager is clamped to
@@ -165,7 +166,7 @@ Computes the Tier 1 wager for one player against all others.
 | `binding_opponent_index` | int or None | The opponent whose worst case sets the requirement. This is the single largest threat, not a combination of opponents. |
 | `min_wager_to_guarantee_win` | int or None | The smallest wager that beats the worst case of every opponent outright. `None` if no wager can guarantee a win. |
 | `max_legal_wager` | int | The largest legal wager (the score of the player). |
-| `lock_tie_wager` | int or None | A wager that locks in at least a tie, when one exists. |
+| `lock_tie_wager` | int or None | A wager that ties for first if the binding opponent bets $0, when one exists. It is not a guarantee: if that opponent bets and is right, they pass you. |
 | `notes` | list of str | Plain-language notes about this result. |
 
 ### `analyze_all(scores: List[int]) -> List[FJRecommendation]`

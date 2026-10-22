@@ -20,7 +20,7 @@ reduced cases of the same model. Full explanation: `docs/white-paper.md`.
   outcomes correlated across all players, and future Daily Doubles found by
   score rank at random points in the rest of the round. Values are
   CALIBRATED to modern-era play (Seasons 38-41, 2021-2025), PUBLISHED
-  (Tesauro et al., 2013, 1990s-2012 games: second place's wager mix) or
+  (Tesauro et al., 2013, pre-2013 games: second place's wager mix) or
   ASSUMED. "Given my real confidence, what maximizes my win odds?"
 
 Tie rule: since 24 Nov 2014 a tie for first goes to a tiebreaker clue.

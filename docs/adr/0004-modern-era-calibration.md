@@ -7,7 +7,7 @@ Date: 2026-10-13
 ## Context
 
 ADR-0003 calibrated the simulated contestants to Tesauro et al. (2013),
-whose data covers roughly the mid-1990s to 2012. Will pointed out that
+whose data covers the mid-1990s to 2012 at the latest. Will pointed out that
 wagering strategy and board play changed radically in the 2010s: players
 now jump to high-value clues to hunt Daily Doubles, and they bet them far
 harder. Behavior from before that shift is out of date.
@@ -17,7 +17,7 @@ statistics. J! Archive publishes per-season Daily Double and Final
 Jeopardy! statistics, but its terms of use forbid scraping and forbid
 republishing "data provided by J! Archive and collected or derived from
 J! Archive". Published articles that quote modern figures (for example,
-FiveThirtyEight, 2018-19) also took them from J! Archive.
+FiveThirtyEight, 2019) also took them from J! Archive.
 
 ## Decision
 
@@ -57,11 +57,15 @@ Negative:
   `engine/behavior.py`. A strict reading of J! Archive's terms could treat
   rounded model settings as "data derived from J! Archive". We publish no
   statistics, tables or quotes, and we would remove the values on a
-  takedown request (the terms require a response to such requests).
+  takedown request (the terms require a response to such requests). The
+  terms also bar "otherwise systematically collect[ing]" data, not only
+  automated scraping. We accept, as part of this risk, the interpretation
+  that reading four season pages by hand for private calibration is
+  allowed.
 - **Not reproducible by readers.** A reader cannot check a calibrated value
   against its source in this repository. The method is described; the data
   is not shipped.
-- **Second place is still pre-2012.** The biggest behavioral component in
+- **Second place is still pre-2013.** The biggest behavioral component in
   Final Jeopardy, second place's bet mix, has no modern source.
 - **Score rank by proxy.** "Who finds a Daily Double" is reported by
   lectern, not score rank. The returning champion's lectern stands in for

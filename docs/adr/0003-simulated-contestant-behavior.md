@@ -12,7 +12,11 @@ Two defects in the Tier 2 and Daily Double engines surfaced on 2026-10-13.
    on the grounds that co-champions both return. That rule ended with the
    24 November 2014 episode. Since then, a tie for first after Final
    Jeopardy is settled by a tiebreaker clue, and only one player returns
-   ([The Ringer, 2021](https://www.theringer.com/2021/01/23/tv/jeopardy-tiebreaker-scenario-rules-changes)).
+   ([Wikipedia, "Jeopardy!"](https://en.wikipedia.org/wiki/Jeopardy!), rules section;
+   date from the [Jeopardy! History Wiki, Season 31](https://jeopardyhistory.fandom.com/wiki/Jeopardy!_Timeline_(syndicated_version)/Season_31),
+   show #6946). The change followed the October 2014 co-champion ties; it
+   was formally announced in 2016, and the first regular-play tiebreaker
+   came in 2018 ([McNear, The Ringer, 2021](https://www.theringer.com/2021/01/23/tv/jeopardy-tiebreaker-scenario-rules-changes)).
    The visible symptom: for a leader whose cover bet was $6,001, Smart Bet
    recommended $6,000 — a bet that only ties second place if they double
    up. Under the real rule that tie is worth about half a win.
@@ -35,10 +39,10 @@ second (B), third (C).
 
 | Role | Bet types and weights | Source |
 |---|---|---|
-| B | all-in 26%, keep C out (bet < B-2C, or cover 2C-B+1) 27%, overtake A (A-B+1) 15%, two-thirds (3B-2A-1) 8%, random 24% | PUBLISHED for the regime B ≥ ¾A and B ≥ 2C (T13 §2.3). ASSUMED for the other five regimes. |
+| B | all-in 26%, keep C out (bet < B-2C, or cover 2C-B+1) 27%, overtake A (A-B+1) 15%, two-thirds (3B-2A-1) 8%, random 24% | PUBLISHED for the regime B ≥ ¾A and B ≥ 2C (T13 §2.3). The "cover 2C-B+1" branch is an ASSUMED extension (it applies only when B < 2C, outside the published regime). ASSUMED for the other five regimes. |
 | A, not locked | cover 2B-A+1 75%, tie-cover 2B-A 10%, all-in 5%, random 10% | ASSUMED. T13 §1.1 says A "usually" covers, "frequently" 2B-A+1, with no split. |
 | A, lockout (A > 2B) | $0 50%, largest safe bet A-2B-1 50% | ASSUMED. |
-| C | random | PUBLISHED that C's bets do not depend on the game state (T13 §2.3 note 5). The flat shape is ASSUMED. |
+| C | even spread over the random grid | PUBLISHED that T13 found no evidence that C's bets track the game state (T13 §2.3 note 5). The even spread is ASSUMED. |
 
 "Random" is an equal spread over 0, ¼, ½, ¾ and all of the score. When a
 bet type does not exist in a state (for example, no third player to keep
@@ -76,11 +80,13 @@ Negative:
   assumptions, not fitted. The published B weights came from groups of
   "only a few hundred samples" each (T13 §2.3), so even those carry wide
   error bars.
-- The data are from roughly the mid-1990s to 2012. Contestant behavior has
+- The data are from the mid-1990s to 2012 at the latest. Contestant behavior has
   likely changed since; non-stationarity is not modeled.
 - Equal tiebreaker odds is an assumption; buzzer skill decides the clue.
-- The reading of "ρ ≈ 0.3" as a binary correlation is our interpretation;
-  the paper does not say which scale it means.
+- The paper defines rho on the binary outcomes (T13 §1.1 Glossary:
+  rho = P(RR) + P(WW) - P(RW) - P(WR)) and generates it by thresholding
+  correlated normals (§2.3). This equals the phi correlation at 50%
+  accuracy; at other accuracies the Sheppard conversion is approximate.
 - Win percentages from any earlier version are not comparable: they scored
   ties as wins against a different opponent model.
 - The app's Daily Double calculation takes about twice as long, because

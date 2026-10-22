@@ -57,7 +57,7 @@ tool: `docs/white-paper.md` (or its PDF twin in `build/`).
    are calibrated to modern-era play (Seasons 38-41, 2021-2025): they hunt
    Daily Doubles and bet them hard, the leader almost always covers, and
    players in front answer Final Jeopardy correctly more often. Second
-   place's wager mix still comes from a published study of 1990s-2012
+   place's wager mix still comes from a published study of pre-2013
    games (Tesauro et al., 2013); the rest are labeled assumptions — see
    `docs/adr/0003-simulated-contestant-behavior.md` and
    `docs/adr/0004-modern-era-calibration.md`. The calibration source

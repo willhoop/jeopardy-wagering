@@ -90,11 +90,14 @@ mechanisms, not findings.
 
 ## 4. Evidence that players underwager
 
-Tesauro, Gondek, Lenchner, Fan and Prager (2013) studied about 3,000 real
-games from the mid-1990s to 2012. In last-Daily-Double situations in the
-second round, they report:
+Tesauro, Gondek, Lenchner, Fan and Prager (2013) studied real games from
+the mid-1990s to 2012 at the latest. In more than 2,200 regular episodes in
+which both second-round Daily Doubles were played, they compare the human
+wager on the last Daily Double with the average bet that their Average
+Contestant simulator recommends at row-based default confidence (T13
+section 3.1.4, Table 3):
 
-| Situation | Average human wager | Wager their model recommends |
+| Situation | Average human wager | Average simulator-recommended wager (row-based default confidence) |
 |---|---|---|
 | Player leading | $2,590 | $5,380 |
 | Player trailing | $3,120 | $6,970 |
@@ -168,10 +171,12 @@ correct in several places:
 - **Second place in Final Jeopardy!.** With $8,000 behind a $12,000 leader
   (third place $6,000) at 70% confidence, the engine recommends $0 (36.9%
   win share). Betting small and hoping the leader misses is a real strategy.
-- **Tournament incentives.** Jeopardy! Masters awards match points per game:
-  3 for first, 1 for second, 0 for third, with dollar totals used only in the
-  two-game final (format as reported for recent seasons; check the official
-  rules for a given year). Second place is worth something, so a bet that
+- **Tournament incentives.** Jeopardy! Masters awards match points per game
+  in the preliminary rounds: 3 for first, 1 for second, 0 for third. The
+  two-game final is decided by combined score (Masters games are scored in
+  points, not dollars). The format varies by season (the 2025 edition added
+  a nine-player knockout round); check the official rules for a given year.
+  Second place is worth something, so a bet that
   risks dropping from second to third has a real cost that regular play does
   not have. Some Masters caution is rational play under those rules, not
   timidity. This weakens Masters as evidence for the thesis: an underwager
@@ -180,7 +185,8 @@ correct in several places:
 
 ## 7. Data used, and what was not used
 
-- **Published:** Tesauro et al. (2013), regular episodes, mid-1990s to 2012.
+- **Published:** Tesauro et al. (2013), regular episodes, mid-1990s to 2012
+  at the latest.
 - **Model calibration:** the engine's simulated rivals are calibrated
   privately to J! Archive season statistics for Seasons 38-41 (ADR-0004).
   Those season pages include the in-season tournaments (for example, the
@@ -203,7 +209,7 @@ correct in several places:
   They depend on the engine's assumptions (simplified regular-clue play,
   simulated rivals, the tiebreaker scoring). They have not been checked
   against real games.
-- The human-average wagers are from before about 2012. Modern players bet
+- The human-average wagers are from before 2013. Modern players bet
   harder; the size of today's gap is unmeasured here.
 - The Masters observation is not tested at all.
 
@@ -246,9 +252,8 @@ print(br.analyze([12000, 8000, 6000], 1, 0.7).recommended_wager)
 - Tesauro, G., Gondek, D., Lenchner, J., Fan, J., & Prager, J. M. (2013).
   Analysis of Watson's strategies for playing Jeopardy!. *Journal of
   Artificial Intelligence Research*, 47, 205-251.
-  https://arxiv.org/pdf/1402.0571
-- Jeopardy! Masters format (match points 3/1/0): TV Insider, "Jeopardy!
-  Masters 2025: matchups, schedule, players, and more."
-  https://tvinsider.com/1184784/jeopardy-masters-2025-prize-cast-premiere-date-more
+  https://doi.org/10.1613/jair.3834 (preprint: https://arxiv.org/pdf/1402.0571)
+- Jeopardy! Masters format (match points 3/1/0): Wikipedia, "Jeopardy!
+  Masters." https://en.wikipedia.org/wiki/Jeopardy!_Masters
 - This project: `docs/white-paper.md` (the engine and its figures),
   `docs/adr/0004-modern-era-calibration.md` (the calibration).
